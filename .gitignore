@@ -6,6 +6,7 @@
 /data/
 # checkpoints
 /checkpoints/
+/exports/
 # old
 /old/
 /experimental/
