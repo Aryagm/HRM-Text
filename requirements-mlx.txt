@@ -1,0 +1,4 @@
+mlx>=0.31.0
+numpy
+safetensors
+transformers
