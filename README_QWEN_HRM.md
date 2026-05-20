@@ -271,6 +271,23 @@ headroom with a stronger answer-prior subtraction: weight `1.7` reaches
 `216 / 299` on full validation for both base and agreement-gated Qwen-HRM. Treat
 that weight as tuned on ARC validation until it is tested on another benchmark.
 
+Calibration transfer checks:
+
+| Fit split | Eval split | Run | Selected weight | Eval correct | Eval no-cal | Eval oracle |
+| --- | --- | --- | ---: | ---: | ---: | ---: |
+| ARC-Challenge validation[:50] | ARC-Challenge validation[50:100] | Qwen3-0.6B Base, option-prior | 1.2 | 20 / 50 | 17 / 50 | 22 / 50 at 1.0 |
+| ARC-Challenge validation[:50] | ARC-Challenge validation[50:100] | Qwen3-0.6B agreement gate, option-prior | 1.2 | 20 / 50 | 17 / 50 | 22 / 50 at 1.0 |
+| ARC-Challenge validation[:50] | ARC-Challenge validation[50:100] | Qwen3-1.7B Base, answer-prior | 1.0 | 35 / 50 | 33 / 50 | 36 / 50 at 1.4 |
+| ARC-Challenge validation[:50] | ARC-Challenge validation[50:100] | Qwen3-1.7B agreement gate, answer-prior | 1.0 | 35 / 50 | 33 / 50 | 36 / 50 at 1.4 |
+| ARC-Challenge validation full | ARC-Easy validation full | Qwen3-0.6B Base, option-prior | 1.0 | 355 / 570 | 348 / 570 | 365 / 570 at 0.8 |
+| ARC-Challenge validation full | ARC-Easy validation full | Qwen3-0.6B agreement gate, option-prior | 1.0 | 355 / 570 | 348 / 570 | 365 / 570 at 0.8 |
+| ARC-Challenge validation full | ARC-Easy validation full | Qwen3-1.7B Base, answer-prior | 1.7 | 489 / 570 | 489 / 570 | 490 / 570 at 0.4 |
+
+This makes the current best no-training rule more conservative: use
+option-prior calibration for Qwen3-0.6B, where it transfers across held-out ARC
+slices and ARC-Easy; do not use the aggressive Qwen3-1.7B weight `1.7` as a
+general default because it fails to transfer to ARC-Easy.
+
 ARC-Easy transfer check:
 
 | Run | Correct |
