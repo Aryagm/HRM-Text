@@ -31,8 +31,8 @@ def normalize_label(label: str, idx: int) -> str:
     return chr(ord("A") + idx)
 
 
-def load_arc_cases(split: str, limit: int | None) -> list[ArcCase]:
-    dataset = load_dataset("allenai/ai2_arc", "ARC-Challenge", split=split)
+def load_arc_cases(arc_config: str, split: str, limit: int | None) -> list[ArcCase]:
+    dataset = load_dataset("allenai/ai2_arc", arc_config, split=split)
     cases = []
     for idx, row in enumerate(dataset):
         if limit is not None and idx >= limit:
@@ -173,8 +173,9 @@ def evaluate(
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="ARC-Challenge logprob probe for Qwen-HRM MLX checkpoints.")
+    parser = argparse.ArgumentParser(description="AI2 ARC logprob probe for Qwen-HRM MLX checkpoints.")
     parser.add_argument("--model", default="mlx-community/Qwen3-1.7B-4bit")
+    parser.add_argument("--arc-config", choices=("ARC-Challenge", "ARC-Easy"), default="ARC-Challenge")
     parser.add_argument("--split", default="validation")
     parser.add_argument("--limit", type=int, default=50)
     parser.add_argument("--mode", choices=("base", "hrm"), default="hrm")
@@ -206,8 +207,9 @@ def main() -> None:
     parser.add_argument("--split-index", type=int, default=None)
     parser.add_argument("--out", type=Path, required=True)
     args = parser.parse_args()
+    effective_calibration_weight = 0.0 if args.calibration == "none" else args.calibration_weight
 
-    cases = load_arc_cases(args.split, args.limit)
+    cases = load_arc_cases(args.arc_config, args.split, args.limit)
     tokenizer = AutoTokenizer.from_pretrained(args.model, use_fast=True, trust_remote_code=True)
     model = QwenHrmForCausalLM.from_pretrained(args.model)
     configure_model(
@@ -232,7 +234,7 @@ def main() -> None:
         cases,
         answer_scoring=args.answer_scoring,
         calibration=args.calibration,
-        calibration_weight=args.calibration_weight,
+        calibration_weight=effective_calibration_weight,
     )
     elapsed = time.perf_counter() - start
     total = len(rows)
@@ -240,6 +242,7 @@ def main() -> None:
     fields = [
         "timestamp_utc",
         "model",
+        "arc_config",
         "split",
         "limit",
         "mode",
@@ -284,12 +287,13 @@ def main() -> None:
                     **{field: "NA" for field in extra_fields},
                     "timestamp_utc": timestamp,
                     "model": args.model,
+                    "arc_config": args.arc_config,
                     "split": args.split,
                     "limit": args.limit,
                     "mode": args.mode,
                     "answer_scoring": args.answer_scoring,
                     "calibration": args.calibration,
-                    "calibration_weight": args.calibration_weight,
+                    "calibration_weight": effective_calibration_weight,
                     "logit_fusion": model.logit_fusion,
                     "logit_blend": model.logit_blend,
                     "h_cycles": model.model.H_cycles,
@@ -307,7 +311,7 @@ def main() -> None:
                 }
             )
     print(
-        f"{args.model} {args.mode} ARC-Challenge {args.split}[:{args.limit}] "
+        f"{args.model} {args.mode} {args.arc_config} {args.split}[:{args.limit}] "
         f"{args.answer_scoring} calibration={args.calibration}: {correct}/{total}"
     )
     print(f"wrote {args.out}")

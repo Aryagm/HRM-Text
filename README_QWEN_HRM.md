@@ -271,6 +271,22 @@ headroom with a stronger answer-prior subtraction: weight `1.7` reaches
 `216 / 299` on full validation for both base and agreement-gated Qwen-HRM. Treat
 that weight as tuned on ARC validation until it is tested on another benchmark.
 
+ARC-Easy transfer check on `validation[:200]`:
+
+| Run | Correct |
+| --- | ---: |
+| Qwen3-0.6B Base | 121 / 200 |
+| Qwen3-0.6B Base, option-prior calibrated | 124 / 200 |
+| Qwen3-0.6B agreement gate, option-prior calibrated | 124 / 200 |
+| Qwen3-1.7B Base | 173 / 200 |
+| Qwen3-1.7B Base, answer-prior calibrated weight 1.0 | 173 / 200 |
+| Qwen3-1.7B Base, answer-prior calibrated weight 1.7 | 172 / 200 |
+| Qwen3-1.7B agreement gate, answer-prior calibrated weight 1.0 | 173 / 200 |
+
+So the 0.6B option-prior gain transfers modestly to ARC-Easy, while the 1.7B
+weight `1.7` setting looks ARC-Challenge-specific and should not be treated as a
+general default yet.
+
 ARC scoring-surface follow-up:
 
 | Run | Correct |
@@ -314,6 +330,8 @@ Additional stability knobs:
 - `--refined-delta-scale` scales the final hidden delta from the base model to
   the refined state before logits are projected.
 - `--split-index` overrides the automatic `L`/`H` layer split.
+- `--arc-config` selects `ARC-Challenge` or `ARC-Easy` in
+  `benchmarks/qwen_arc_probe.py`.
 - `--calibration` on `benchmarks/qwen_arc_probe.py` subtracts a no-training
   prior from each ARC answer score. Tracked options are `answer_prior` and
   `options_prior`; full-validation runs show `options_prior` is best so far for
