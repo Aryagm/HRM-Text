@@ -153,6 +153,10 @@ const exactRows = [
   ...(await readRows("exact_qwen3_0_6b_hrm.csv").catch(() => [])),
   ...(await readRows("exact_qwen3_1_7b_base.csv").catch(() => [])),
   ...(await readRows("exact_qwen3_1_7b_hrm.csv").catch(() => [])),
+  ...(await readRows("exact_qwen3_1_7b_base_chat_boxed.csv").catch(() => [])),
+  ...(await readRows("exact_qwen3_1_7b_hrm_chat_boxed.csv").catch(() => [])),
+  ...(await readRows("exact_qwen3_1_7b_hrm_chat_boxed_blend01.csv").catch(() => [])),
+  ...(await readRows("exact_qwen3_1_7b_hrm_chat_boxed_blend005.csv").catch(() => [])),
   ...(await readRows("exact_hrm_text_1b_4bit_corrected.csv").catch(() => [])),
   ...(await readRows("exact_hrm_text_1b_bf16_corrected.csv").catch(() => [])),
 ];
@@ -214,9 +218,16 @@ summary.getRange("G4:I10").format.numberFormat = "0.00";
 writeTable(
   summary,
   "A9",
-  ["Exact Model", "Mode", "Correct", "Total", "Accuracy", "Delta vs Base", "Elapsed s", "Avg Case s"],
+  ["Exact Model", "Mode", "Correct", "Total", "Accuracy", "Delta vs Base", "Elapsed s", "Avg Case s", "Source"],
   exactRuns.map((r) => {
-    const base = exactRuns.find((candidate) => candidate.model === r.model && candidate.mode === "base");
+    const base = exactRuns.find(
+      (candidate) =>
+        candidate.model === r.model &&
+        candidate.mode === "base" &&
+        (candidate.prompt_style || "") === (r.prompt_style || "") &&
+        (candidate.chat_template || "") === (r.chat_template || "") &&
+        (candidate.enable_thinking || "") === (r.enable_thinking || ""),
+    );
     const delta = base ? Number(r.correct) - Number(base.correct) : "";
     return [
       modelLabel(r.model),
@@ -227,6 +238,7 @@ writeTable(
       delta,
       asNumber(r.elapsed_total_s),
       asNumber(r.avg_case_s),
+      r.source_file,
     ];
   }),
 );
@@ -349,7 +361,21 @@ sweepSheet.getRange("G2:G500").format.numberFormat = "0.00";
 writeTable(
   exactSheet,
   "A1",
-  ["Model", "Mode", "Correct", "Total", "Accuracy", "Elapsed s", "Avg Case s", "Correct Cases", "Source"],
+  [
+    "Model",
+    "Mode",
+    "Correct",
+    "Total",
+    "Accuracy",
+    "Elapsed s",
+    "Avg Case s",
+    "Prompt Style",
+    "Chat Template",
+    "Thinking",
+    "Blend",
+    "Correct Cases",
+    "Source",
+  ],
   exactRuns.map((r) => [
     modelLabel(r.model),
     exactModeLabel(r),
@@ -358,6 +384,10 @@ writeTable(
     asNumber(r.accuracy),
     asNumber(r.elapsed_total_s),
     asNumber(r.avg_case_s),
+    r.prompt_style || "",
+    r.chat_template || "",
+    r.enable_thinking || "",
+    r.logit_blend || "",
     r.correct_cases,
     r.source_file,
   ]),
@@ -368,7 +398,7 @@ exactSheet.getRange("F2:G50").format.numberFormat = "0.00";
 writeTable(
   exactCasesSheet,
   "A1",
-  ["Model", "Mode", "Case", "Expected", "Extracted", "Correct", "Elapsed s", "Source"],
+  ["Model", "Mode", "Case", "Expected", "Extracted", "Correct", "Elapsed s", "Prompt Style", "Chat Template", "Thinking", "Blend", "Source"],
   exactRows.map((r) => [
     modelLabel(r.model),
     exactModeLabel(r),
@@ -377,6 +407,10 @@ writeTable(
     r.extracted,
     r.is_correct,
     asNumber(r.elapsed_s),
+    r.prompt_style || "",
+    r.chat_template || "",
+    r.enable_thinking || "",
+    r.logit_blend || "",
     r.source_file,
   ]),
 );

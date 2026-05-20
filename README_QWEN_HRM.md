@@ -155,6 +155,22 @@ conversion is far from a decisive HRM-level jump. HRM-Text must be evaluated
 with its documented boxed-answer prompt and enough generation budget; the earlier
 short `Final answer:` prompt undercounted both 4-bit and BF16 badly.
 
+Follow-up Qwen3-1.7B chat-template runs with boxed final answers did not rescue
+the generative exact score:
+
+| Run | Correct |
+| --- | ---: |
+| Qwen3-1.7B Base, chat + boxed | 6 / 17 |
+| Qwen3-1.7B Qwen-HRM, chat + boxed, blend 0.20 | 5 / 17 |
+| Qwen3-1.7B Qwen-HRM, chat + boxed, blend 0.10 | 5 / 17 |
+| Qwen3-1.7B Qwen-HRM, chat + boxed, blend 0.05 | 5 / 17 |
+
+That points to a real limitation in the current no-training fusion: fixed logit
+blending can improve candidate log-probability ranking while still damaging
+open-ended chat generation. The next inference strategy should gate or rerank
+with a verifier rather than blindly blend refined logits on every generated
+token.
+
 For broader evaluation, the repo's standard benchmark runner now has an MLX
 Qwen-HRM engine. Use it for small Apple Silicon slices before spending time on
 full benchmark passes:

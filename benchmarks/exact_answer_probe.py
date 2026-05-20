@@ -155,8 +155,23 @@ def is_correct(raw_output: str, expected: tuple[str, ...]) -> tuple[bool, str]:
     return False, extracted
 
 
-def qwen_prompt(prompt: str) -> str:
-    return f"{prompt}\nReason briefly. End with exactly one line in this format: Final answer: your answer"
+def qwen_prompt(prompt: str, prompt_style: str) -> str:
+    if prompt_style == "boxed":
+        return f"{prompt}\nReason step by step, and put your final answer within \\boxed{{}}."
+    if prompt_style == "final":
+        return f"{prompt}\nReason briefly. End with exactly one line in this format: Final answer: your answer"
+    raise ValueError(f"Unsupported prompt_style {prompt_style!r}. Use final or boxed.")
+
+
+def apply_qwen_chat_template(tokenizer, prompt: str, *, enabled: bool, enable_thinking: bool) -> str:
+    if not enabled:
+        return prompt
+    return tokenizer.apply_chat_template(
+        [{"role": "user", "content": prompt}],
+        tokenize=False,
+        add_generation_prompt=True,
+        enable_thinking=enable_thinking,
+    )
 
 
 def hrm_prompt(prompt: str) -> str:
@@ -164,7 +179,7 @@ def hrm_prompt(prompt: str) -> str:
     return f"<|im_start|><|quad_end|><|object_ref_end|>{inner}<|im_end|>"
 
 
-def configure_qwen(model: QwenHrmForCausalLM, mode: str) -> None:
+def configure_qwen(model: QwenHrmForCausalLM, mode: str, logit_blend: float | None = None) -> None:
     if mode == "base":
         model.model.H_cycles = 0
         model.model.L_cycles = 1
@@ -180,12 +195,20 @@ def configure_qwen(model: QwenHrmForCausalLM, mode: str) -> None:
     model.model.update_mix_l = 1.0
     model.model.update_mix_h = 1.0
     model.model.refined_delta_scale = 1.0
-    model.logit_blend = 0.2
+    model.logit_blend = 0.2 if logit_blend is None else logit_blend
     model.logit_fusion = "blend"
     model.fusion_threshold = 0.0
 
 
-def run_qwen(model_id: str, mode: str, max_tokens: int) -> list[dict[str, str | int | float | bool]]:
+def run_qwen(
+    model_id: str,
+    mode: str,
+    max_tokens: int,
+    prompt_style: str,
+    chat_template: bool,
+    enable_thinking: bool,
+    logit_blend: float | None,
+) -> list[dict[str, str | int | float | bool]]:
     import mlx.core as mx
     from transformers import AutoTokenizer
 
@@ -194,16 +217,22 @@ def run_qwen(model_id: str, mode: str, max_tokens: int) -> list[dict[str, str | 
 
     tokenizer = AutoTokenizer.from_pretrained(model_id, use_fast=True, trust_remote_code=True)
     model = QwenHrmForCausalLM.from_pretrained(model_id)
-    configure_qwen(model, mode)
+    configure_qwen(model, mode, logit_blend=logit_blend)
     mx.eval(model.parameters())
 
     rows = []
     for case in CASES:
+        prompt = apply_qwen_chat_template(
+            tokenizer,
+            qwen_prompt(case.prompt, prompt_style),
+            enabled=chat_template,
+            enable_thinking=enable_thinking,
+        )
         start = time.perf_counter()
         output = generate_qwen(
             model,
             tokenizer,
-            qwen_prompt(case.prompt),
+            prompt,
             max_tokens=max_tokens,
             temperature=0.0,
             eos_token_id=tokenizer.eos_token_id,
@@ -217,6 +246,11 @@ def run_qwen(model_id: str, mode: str, max_tokens: int) -> list[dict[str, str | 
                 "extracted": extracted,
                 "is_correct": correct,
                 "elapsed_s": elapsed,
+                "prompt_style": prompt_style,
+                "chat_template": chat_template,
+                "enable_thinking": enable_thinking,
+                "max_tokens": max_tokens,
+                "logit_blend": model.logit_blend,
                 "output": output,
             }
         )
@@ -254,6 +288,11 @@ def run_hrm_text(model_dir: str, max_tokens: int, dtype: str) -> list[dict[str, 
                 "extracted": extracted,
                 "is_correct": correct,
                 "elapsed_s": elapsed,
+                "prompt_style": "boxed",
+                "chat_template": False,
+                "enable_thinking": False,
+                "max_tokens": max_tokens,
+                "logit_blend": "",
                 "output": output,
             }
         )
@@ -276,6 +315,11 @@ def write_results(out: Path, model: str, mode: str, rows: list[dict[str, str | i
         "extracted",
         "is_correct",
         "elapsed_s",
+        "prompt_style",
+        "chat_template",
+        "enable_thinking",
+        "max_tokens",
+        "logit_blend",
         "output",
     ]
     with out.open("w", newline="") as handle:
@@ -306,10 +350,22 @@ def main() -> None:
     parser.add_argument("--out", type=Path, required=True)
     parser.add_argument("--max-tokens", type=int, default=96)
     parser.add_argument("--dtype", choices=("bfloat16", "float16", "float32"), default="bfloat16")
+    parser.add_argument("--qwen-prompt-style", choices=("final", "boxed"), default="final")
+    parser.add_argument("--qwen-chat-template", action="store_true")
+    parser.add_argument("--qwen-enable-thinking", action="store_true")
+    parser.add_argument("--qwen-logit-blend", type=float, default=None)
     args = parser.parse_args()
 
     if args.engine == "qwen":
-        rows = run_qwen(args.model, args.mode, args.max_tokens)
+        rows = run_qwen(
+            args.model,
+            args.mode,
+            args.max_tokens,
+            args.qwen_prompt_style,
+            args.qwen_chat_template,
+            args.qwen_enable_thinking,
+            args.qwen_logit_blend,
+        )
         write_results(args.out, args.model, args.mode, rows)
     else:
         rows = run_hrm_text(args.model, args.max_tokens, args.dtype)
