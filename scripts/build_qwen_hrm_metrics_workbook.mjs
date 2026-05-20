@@ -204,6 +204,7 @@ const arcRows = [
   ...(await readRows("arc_qwen3_0_6b_base_choice_text_validation50.csv").catch(() => [])),
   ...(await readRows("arc_qwen3_0_6b_base_label_text_validation50.csv").catch(() => [])),
   ...(await readRows("arc_qwen3_0_6b_hrm_validation50.csv").catch(() => [])),
+  ...(await readRows("arc_qwen3_0_6b_hrm_refined_validation50.csv").catch(() => [])),
   ...(await readRows("arc_qwen3_0_6b_hrm_agreement_validation50.csv").catch(() => [])),
   ...(await readRows("arc_qwen3_0_6b_hrm_agreement_choice_text_validation50.csv").catch(() => [])),
   ...(await readRows("arc_qwen3_0_6b_hrm_agreement_label_text_validation50.csv").catch(() => [])),
@@ -217,6 +218,7 @@ const arcRows = [
   ...(await readRows("arc_qwen3_1_7b_base_choice_text_validation50.csv").catch(() => [])),
   ...(await readRows("arc_qwen3_1_7b_base_label_text_validation50.csv").catch(() => [])),
   ...(await readRows("arc_qwen3_1_7b_hrm_validation50.csv").catch(() => [])),
+  ...(await readRows("arc_qwen3_1_7b_hrm_refined_validation50.csv").catch(() => [])),
   ...(await readRows("arc_qwen3_1_7b_hrm_agreement_validation50.csv").catch(() => [])),
   ...(await readRows("arc_qwen3_1_7b_hrm_agreement_choice_text_validation50.csv").catch(() => [])),
   ...(await readRows("arc_qwen3_1_7b_hrm_agreement_label_text_validation50.csv").catch(() => [])),
@@ -640,7 +642,7 @@ writeTable(
 );
 arcScoreEnsembleSheet.getRange("H2:H50").format.numberFormat = "0.0%";
 
-notes.getRange("A1:B19").values = [
+notes.getRange("A1:B20").values = [
   ["Item", "Note"],
   ["Benchmark", "Closed-form multiple-choice probe scored by candidate letter log-probability."],
   ["Current wins", "Qwen3-0.6B-4bit improves from 5/17 to 7/17 with split 14; Qwen3-1.7B-4bit improves from 10/17 to 11/17 with split 10."],
@@ -650,6 +652,7 @@ notes.getRange("A1:B19").values = [
   ["Delayed fusion", "Final-answer-triggered HRM fusion also recovers the 6/17 base score on Qwen3-1.7B chat-template boxed runs. It is safer than full-sequence fixed blending but still not above base."],
   ["Candidate rerank", "Saved-output candidate reranking found an 11/17 oracle union across raw/chat candidates, but naive yes/no and answer-likelihood rerankers selected only 6/17. Need a stronger verifier."],
   ["ARC-Challenge slice", "On ARC-Challenge validation[:50], Qwen3-0.6B is flat at 21/50 for base, fixed blend, and agreement_blend; Qwen3-1.7B base is 37/50, fixed blend is 35/50, and agreement_blend recovers 37/50."],
+  ["ARC pure refined", "Pure refined-output scoring collapses on ARC validation[:50]: Qwen3-0.6B drops to 14/50 and Qwen3-1.7B drops to 9/50. This conversion needs conservative fusion; the recurrent path is not a standalone no-training HRM replacement."],
   ["ARC margin ensemble", "A base-margin switch to HRM when base top-two margin <= 0.25 improves Qwen3-0.6B validation[:50] from 21/50 to 23/50, but drops validation[50:100] from 17/50 to 16/50 and Qwen3-1.7B from 37/50 to 36/50. Treat as overfit."],
   ["ARC architecture probes", "Qwen3-0.6B agreement_blend with H=2 and with split_index=10 both remained 21/50 on ARC validation[:50]. Deeper recurrence or a smaller L split did not improve the dataset-backed slice."],
   ["ARC full validation", "On full ARC-Challenge validation, Qwen3-0.6B base and agreement_blend both score 112/299; Qwen3-1.7B base and agreement_blend both score 207/299. The safer gated fusion preserves base but does not improve the full validation split."],
@@ -665,8 +668,8 @@ notes.getRange("A1:B1").format = {
   fill: { type: "solid", color: "#1F4E78" },
   font: { color: "#FFFFFF", bold: true },
 };
-notes.getRange("A1:B19").format.wrapText = true;
-notes.getRange("A1:B19").format.autofitColumns();
+notes.getRange("A1:B20").format.wrapText = true;
+notes.getRange("A1:B20").format.autofitColumns();
 
 for (const sheet of [
   summary,
@@ -696,7 +699,7 @@ console.log(errors.ndjson);
 await workbook.render({ sheetName: "Summary", range: "A1:I16", scale: 2 });
 await workbook.render({ sheetName: "Exact Runs", range: "A1:N14", scale: 2 });
 await workbook.render({ sheetName: "Rerank Runs", range: "A1:K8", scale: 2 });
-await workbook.render({ sheetName: "ARC Runs", range: "A1:O25", scale: 2 });
+await workbook.render({ sheetName: "ARC Runs", range: "A1:O27", scale: 2 });
 await workbook.render({ sheetName: "ARC Ensembles", range: "A1:H11", scale: 2 });
 await workbook.render({ sheetName: "ARC Score Ensembles", range: "A1:J5", scale: 2 });
 const output = await SpreadsheetFile.exportXlsx(workbook);

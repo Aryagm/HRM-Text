@@ -198,15 +198,20 @@ ARC-Challenge validation slice:
 | --- | ---: |
 | Qwen3-0.6B Base, validation[:50] | 21 / 50 |
 | Qwen3-0.6B Qwen-HRM, fixed blend | 21 / 50 |
+| Qwen3-0.6B Qwen-HRM, pure refined output | 14 / 50 |
 | Qwen3-0.6B Qwen-HRM, agreement gate | 21 / 50 |
 | Qwen3-1.7B Base, validation[:50] | 37 / 50 |
 | Qwen3-1.7B Qwen-HRM, fixed blend | 35 / 50 |
+| Qwen3-1.7B Qwen-HRM, pure refined output | 9 / 50 |
 | Qwen3-1.7B Qwen-HRM, agreement gate | 37 / 50 |
 
 This dataset-backed slice weakens the earlier custom-MC story: the 0.6B gain did
 not transfer to ARC, and fixed blend is risky outside the tiny hand-written MC
 probe. Agreement-gated fusion is the safer no-training default, but it is
 currently a preservation strategy rather than a reliable improvement strategy.
+Pure refined-output scoring is much worse, which means the current conversion's
+recurrent path is not usable as a standalone HRM substitute without calibration
+or training.
 
 Exploratory ARC margin switch:
 
