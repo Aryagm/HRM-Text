@@ -288,6 +288,16 @@ option-prior calibration for Qwen3-0.6B, where it transfers across held-out ARC
 slices and ARC-Easy; do not use the aggressive Qwen3-1.7B weight `1.7` as a
 general default because it fails to transfer to ARC-Easy.
 
+Auto-calibration smoke runs:
+
+| Run | Resolved calibration | Correct |
+| --- | --- | ---: |
+| Qwen3-0.6B Base, ARC-Challenge validation[:10], `--calibration auto` | `options_prior` weight `1.0` | 3 / 10 |
+| Qwen3-1.7B Base, ARC-Challenge validation[:10], `--calibration auto` | `answer_prior` weight `1.0` | 8 / 10 |
+
+These are not new headline benchmark claims; they verify the CLI resolves the
+transferred policy correctly for both checkpoint sizes.
+
 ARC-Easy transfer check:
 
 | Run | Correct |
