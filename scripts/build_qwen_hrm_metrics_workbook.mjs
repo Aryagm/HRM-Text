@@ -47,13 +47,16 @@ function parseCSV(text) {
 }
 
 async function readRows(file) {
-  return parseCSV(await fs.readFile(path.join(METRICS_DIR, file), "utf8"));
+  return parseCSV(await fs.readFile(path.join(METRICS_DIR, file), "utf8")).map((row) => ({
+    source_file: file,
+    ...row,
+  }));
 }
 
 function uniqueRuns(rows) {
   const runs = new Map();
   for (const row of rows) {
-    const key = `${row.model}|${row.run_id}`;
+    const key = `${row.source_file}|${row.model}|${row.run_id}`;
     if (!runs.has(key)) {
       runs.set(key, row);
     }
@@ -102,9 +105,12 @@ function writeTable(sheet, startCell, headers, rows) {
 const final06 = await readRows("final_qwen3_0_6b_corrected.csv");
 const final17 = await readRows("final_qwen3_1_7b_corrected.csv");
 const sweep06 = await readRows("sweep_qwen3_0_6b_expanded_focused.csv").catch(() => []);
+const split06 = await readRows("sweep_qwen3_0_6b_split.csv").catch(() => []);
+const split17 = await readRows("sweep_qwen3_1_7b_split.csv").catch(() => []);
+const tight17 = await readRows("sweep_qwen3_1_7b_split10_tight.csv").catch(() => []);
 const finalRows = [...final06, ...final17];
 const finalRuns = uniqueRuns(finalRows);
-const sweepRuns = uniqueRuns(sweep06);
+const sweepRuns = uniqueRuns([...sweep06, ...split06, ...split17, ...tight17]);
 
 const workbook = Workbook.create();
 const summary = workbook.worksheets.add("Summary");
@@ -163,6 +169,7 @@ writeTable(
     "Beta",
     "Update Mix",
     "Delta Scale",
+    "Split",
   ],
   finalRuns.map((r) => [
     modelLabel(r.model),
@@ -179,6 +186,7 @@ writeTable(
     asNumber(r.beta_l),
     asNumber(r.update_mix_l),
     asNumber(r.refined_delta_scale),
+    asNumber(r.split_index),
   ]),
 );
 finalSheet.getRange("E2:E20").format.numberFormat = "0.0%";
@@ -222,6 +230,8 @@ writeTable(
     "Beta",
     "Update Mix",
     "Delta Scale",
+    "Split",
+    "Source",
   ],
   sweepRuns.map((r) => [
     modelLabel(r.model),
@@ -239,6 +249,8 @@ writeTable(
     asNumber(r.beta_l),
     asNumber(r.update_mix_l),
     asNumber(r.refined_delta_scale),
+    asNumber(r.split_index),
+    r.source_file,
   ]),
 );
 sweepSheet.getRange("F2:F500").format.numberFormat = "0.0%";
@@ -247,8 +259,8 @@ sweepSheet.getRange("G2:G500").format.numberFormat = "0.00";
 notes.getRange("A1:B8").values = [
   ["Item", "Note"],
   ["Benchmark", "Closed-form multiple-choice probe scored by candidate letter log-probability."],
-  ["Current win", "Qwen3-0.6B-4bit improves from 5/17 to 7/17 with H=1, L=1, blend=0.2, alpha_l=0.03, alpha_h=0.05, beta=0.01."],
-  ["No win", "Qwen3-1.7B-4bit remains 10/17 under the same setting; HRM changes margins but not accuracy."],
+  ["Current wins", "Qwen3-0.6B-4bit improves from 5/17 to 7/17 with split 14; Qwen3-1.7B-4bit improves from 10/17 to 11/17 with split 10."],
+  ["Split finding", "The symmetric 14/14 split is best for 0.6B; an earlier split at 10 lower layers is best for 1.7B on the corrected probe."],
   ["Cost", "HRM is slower because it adds warm split and recurrent passes per scored candidate/token."],
   ["Correction", "Earlier sequence answer was corrected from 80 to 67 before final runs."],
   ["Interpretation", "No-training recurrence helps the smaller model on this probe, but this is not yet broad HRM-level performance."],

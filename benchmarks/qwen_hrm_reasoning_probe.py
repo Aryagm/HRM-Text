@@ -162,10 +162,13 @@ def evaluate_mode(
     update_mix_l: float | None,
     update_mix_h: float | None,
     refined_delta_scale: float | None,
+    split_index: int | None,
 ) -> tuple[int, list[tuple[Case, str, dict[str, float]]]]:
     model.model.H_cycles = h_cycles
     model.model.L_cycles = l_cycles
     model.logit_blend = logit_blend
+    if split_index is not None:
+        model.model.config.split_index = split_index
     if alpha_l is not None:
         model.model.alpha_l = alpha_l
     if alpha_h is not None:
@@ -205,6 +208,7 @@ def main() -> None:
     parser.add_argument("--update-mix-l", type=float, default=None)
     parser.add_argument("--update-mix-h", type=float, default=None)
     parser.add_argument("--refined-delta-scale", type=float, default=None)
+    parser.add_argument("--split-index", type=int, default=None, help="Number of lower layers assigned to L.")
     parser.add_argument("--include-base", action="store_true")
     args = parser.parse_args()
 
@@ -232,6 +236,7 @@ def main() -> None:
             update_mix_l=args.update_mix_l,
             update_mix_h=args.update_mix_h,
             refined_delta_scale=args.refined_delta_scale,
+            split_index=args.split_index,
         )
         print(f"== {label} ==")
         for case, prediction, scores in rows:

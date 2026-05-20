@@ -96,7 +96,11 @@ class QwenHrmConfig:
 
     @property
     def lower_layers(self) -> int:
-        return self.split_index or (self.num_hidden_layers // 2)
+        if self.split_index is not None:
+            return self.split_index
+        if self.model_type == "qwen3" and self.num_hidden_layers == 28 and self.hidden_size >= 2048:
+            return 10
+        return self.num_hidden_layers // 2
 
 
 class KVCache:

@@ -33,6 +33,7 @@ def main() -> None:
     parser.add_argument("--beta", default="0.0,0.01")
     parser.add_argument("--update-mix", default="0.25,0.5,1.0")
     parser.add_argument("--refined-delta-scale", default="0.25,0.5,1.0")
+    parser.add_argument("--split-index", default="", help="Comma-separated L/H split points. Empty uses the checkpoint default.")
     parser.add_argument("--limit", type=int, default=None)
     args = parser.parse_args()
 
@@ -41,6 +42,7 @@ def main() -> None:
     mx.eval(model.parameters())
 
     configs = []
+    split_indices = parse_int_list(args.split_index) if args.split_index else [model.config.lower_layers]
     configs.append(
         {
             "label": "base",
@@ -54,34 +56,37 @@ def main() -> None:
             "update_mix_l": 1.0,
             "update_mix_h": 1.0,
             "refined_delta_scale": 0.0,
+            "split_index": model.config.lower_layers,
         }
     )
 
-    for h_cycles in parse_int_list(args.h_cycles):
-        for l_cycles in parse_int_list(args.l_cycles):
-            for blend in parse_float_list(args.logit_blends):
-                if blend <= 0:
-                    continue
-                for alpha_l in parse_float_list(args.alpha_l):
-                    for alpha_h in parse_float_list(args.alpha_h):
-                        for beta in parse_float_list(args.beta):
-                            for update_mix in parse_float_list(args.update_mix):
-                                for delta_scale in parse_float_list(args.refined_delta_scale):
-                                    configs.append(
-                                        {
-                                            "label": "hrm",
-                                            "h_cycles": h_cycles,
-                                            "l_cycles": l_cycles,
-                                            "logit_blend": blend,
-                                            "alpha_l": alpha_l,
-                                            "alpha_h": alpha_h,
-                                            "beta_l": beta,
-                                            "beta_h": beta,
-                                            "update_mix_l": update_mix,
-                                            "update_mix_h": update_mix,
-                                            "refined_delta_scale": delta_scale,
-                                        }
-                                    )
+    for split_index in split_indices:
+        for h_cycles in parse_int_list(args.h_cycles):
+            for l_cycles in parse_int_list(args.l_cycles):
+                for blend in parse_float_list(args.logit_blends):
+                    if blend <= 0:
+                        continue
+                    for alpha_l in parse_float_list(args.alpha_l):
+                        for alpha_h in parse_float_list(args.alpha_h):
+                            for beta in parse_float_list(args.beta):
+                                for update_mix in parse_float_list(args.update_mix):
+                                    for delta_scale in parse_float_list(args.refined_delta_scale):
+                                        configs.append(
+                                            {
+                                                "label": "hrm",
+                                                "h_cycles": h_cycles,
+                                                "l_cycles": l_cycles,
+                                                "logit_blend": blend,
+                                                "alpha_l": alpha_l,
+                                                "alpha_h": alpha_h,
+                                                "beta_l": beta,
+                                                "beta_h": beta,
+                                                "update_mix_l": update_mix,
+                                                "update_mix_h": update_mix,
+                                                "refined_delta_scale": delta_scale,
+                                                "split_index": split_index,
+                                            }
+                                        )
 
     if args.limit is not None:
         configs = configs[: args.limit]
@@ -106,6 +111,7 @@ def main() -> None:
         "update_mix_l",
         "update_mix_h",
         "refined_delta_scale",
+        "split_index",
         "case",
         "expected",
         "prediction",
@@ -135,13 +141,14 @@ def main() -> None:
                 update_mix_l=float(cfg["update_mix_l"]),
                 update_mix_h=float(cfg["update_mix_h"]),
                 refined_delta_scale=float(cfg["refined_delta_scale"]),
+                split_index=int(cfg["split_index"]),
             )
             elapsed = time.perf_counter() - start
             accuracy = correct / len(CASES)
             print(
                 f"{run_id:04d} {cfg['label']} acc={correct}/{len(CASES)} elapsed={elapsed:.2f}s "
                 f"H={cfg['h_cycles']} blend={cfg['logit_blend']} a=({cfg['alpha_l']},{cfg['alpha_h']}) "
-                f"beta={cfg['beta_l']} mix={cfg['update_mix_l']} delta={cfg['refined_delta_scale']}",
+                f"beta={cfg['beta_l']} mix={cfg['update_mix_l']} delta={cfg['refined_delta_scale']} split={cfg['split_index']}",
                 flush=True,
             )
 

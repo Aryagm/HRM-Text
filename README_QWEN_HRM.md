@@ -88,6 +88,12 @@ Embedding
   -> blended logits = (1 - blend) * base + blend * refined
 ```
 
+The default split is size-aware:
+
+- Qwen3-0.6B uses the symmetric split, `L = 14`, `H = 14`.
+- Qwen3-1.7B uses `L = 10`, `H = 18`, which was better than the symmetric
+  split on the corrected probe.
+
 The wrapper preserves separate KV caches for the base pass, warm split pass, and
 each recurrent `L`/`H` pass. That is heavier than a normal decode, but it is the
 closest no-training version to HRM while keeping the pretrained model's original
@@ -113,12 +119,11 @@ Corrected 17-question multiple-choice probe:
 | Model | Base | HRM default | Delta |
 | --- | ---: | ---: | ---: |
 | Qwen3-0.6B-4bit | 5 / 17 | 7 / 17 | +2 |
-| Qwen3-1.7B-4bit | 10 / 17 | 10 / 17 | 0 |
+| Qwen3-1.7B-4bit | 10 / 17 | 11 / 17 | +1 |
 
-The current gain is real but narrow: the no-training recurrence helps the smaller
-0.6B checkpoint on this probe, while the stronger 1.7B checkpoint only changes
-logit margins and latency. Treat this as an experimental conversion baseline,
-not a broad HRM-level result yet.
+The current gain is real but narrow: the no-training recurrence improves both
+tracked checkpoints on this probe, with the stronger effect on 0.6B. Treat this
+as an experimental conversion baseline, not a broad HRM-level result yet.
 
 Additional stability knobs:
 
@@ -127,3 +132,4 @@ Additional stability knobs:
   fully replacing it with the next recurrent block output.
 - `--refined-delta-scale` scales the final hidden delta from the base model to
   the refined state before logits are projected.
+- `--split-index` overrides the automatic `L`/`H` layer split.

@@ -81,6 +81,7 @@ def main() -> None:
     parser.add_argument("--update-mix-l", type=float, default=None)
     parser.add_argument("--update-mix-h", type=float, default=None)
     parser.add_argument("--refined-delta-scale", type=float, default=None)
+    parser.add_argument("--split-index", type=int, default=None, help="Number of lower layers assigned to L.")
     parser.add_argument("--logit-blend", type=float, default=None, help="0.0 is base model only, 1.0 is HRM logits only.")
     parser.add_argument("--revision", type=str, default=None)
     args = parser.parse_args()
@@ -108,6 +109,8 @@ def main() -> None:
         model.model.update_mix_h = args.update_mix_h
     if args.refined_delta_scale is not None:
         model.model.refined_delta_scale = args.refined_delta_scale
+    if args.split_index is not None:
+        model.model.config.split_index = args.split_index
     if args.logit_blend is not None:
         model.logit_blend = args.logit_blend
     model.use_static_cache = args.static_cache
