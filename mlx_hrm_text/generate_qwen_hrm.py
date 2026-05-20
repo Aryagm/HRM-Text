@@ -83,6 +83,8 @@ def main() -> None:
     parser.add_argument("--refined-delta-scale", type=float, default=None)
     parser.add_argument("--split-index", type=int, default=None, help="Number of lower layers assigned to L.")
     parser.add_argument("--logit-blend", type=float, default=None, help="0.0 is base model only, 1.0 is HRM logits only.")
+    parser.add_argument("--logit-fusion", choices=("blend", "confidence_gate", "agreement_blend"), default=None)
+    parser.add_argument("--fusion-threshold", type=float, default=None)
     parser.add_argument("--revision", type=str, default=None)
     args = parser.parse_args()
 
@@ -113,6 +115,10 @@ def main() -> None:
         model.model.config.split_index = args.split_index
     if args.logit_blend is not None:
         model.logit_blend = args.logit_blend
+    if args.logit_fusion is not None:
+        model.logit_fusion = args.logit_fusion
+    if args.fusion_threshold is not None:
+        model.fusion_threshold = args.fusion_threshold
     model.use_static_cache = args.static_cache
     mx.eval(model.parameters())
 

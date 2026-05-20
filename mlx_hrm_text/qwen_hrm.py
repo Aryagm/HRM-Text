@@ -59,6 +59,8 @@ class QwenHrmConfig:
     update_mix_h: float = 1.0
     refined_delta_scale: float = 1.0
     logit_blend: float = 0.2
+    logit_fusion: str = "blend"
+    fusion_threshold: float = 0.0
     quantization: dict[str, Any] | None = None
     quantization_config: dict[str, Any] | None = None
 
@@ -90,6 +92,8 @@ class QwenHrmConfig:
             update_mix_h=float(data.get("update_mix_h", 1.0)),
             refined_delta_scale=float(data.get("refined_delta_scale", 1.0)),
             logit_blend=float(data.get("logit_blend", 0.2)),
+            logit_fusion=str(data.get("logit_fusion", "blend")),
+            fusion_threshold=float(data.get("fusion_threshold", 0.0)),
             quantization=data.get("quantization"),
             quantization_config=data.get("quantization_config"),
         )
@@ -378,6 +382,8 @@ class QwenHrmForCausalLM(nn.Module):
         self.model = QwenHrmBackbone(config)
         self.lm_head = None if config.tie_word_embeddings else nn.Linear(config.hidden_size, config.vocab_size, bias=False)
         self.logit_blend = config.logit_blend
+        self.logit_fusion = config.logit_fusion
+        self.fusion_threshold = config.fusion_threshold
         self.use_static_cache = False
 
     @classmethod
@@ -444,6 +450,35 @@ class QwenHrmForCausalLM(nn.Module):
             return self.lm_head(hidden)
         return self.model.embed_tokens.as_linear(hidden)
 
+    def _fuse_logits(self, base_logits: mx.array, refined_logits: mx.array) -> mx.array:
+        if self.logit_fusion == "blend":
+            if self.logit_blend <= 0:
+                return base_logits
+            if self.logit_blend >= 1:
+                return refined_logits
+            return (1.0 - self.logit_blend) * base_logits + self.logit_blend * refined_logits
+
+        if self.logit_fusion == "confidence_gate":
+            base_log_probs = base_logits.astype(mx.float32) - mx.logsumexp(base_logits.astype(mx.float32), axis=-1, keepdims=True)
+            refined_log_probs = refined_logits.astype(mx.float32) - mx.logsumexp(
+                refined_logits.astype(mx.float32), axis=-1, keepdims=True
+            )
+            base_confidence = mx.max(base_log_probs, axis=-1, keepdims=True)
+            refined_confidence = mx.max(refined_log_probs, axis=-1, keepdims=True)
+            use_refined = refined_confidence > (base_confidence + self.fusion_threshold)
+            selected = mx.where(use_refined, refined_logits, base_logits)
+            if self.logit_blend <= 0:
+                return selected
+            blended = (1.0 - self.logit_blend) * base_logits + self.logit_blend * refined_logits
+            return mx.where(use_refined, blended, base_logits)
+
+        if self.logit_fusion == "agreement_blend":
+            same_top = mx.argmax(base_logits, axis=-1, keepdims=True) == mx.argmax(refined_logits, axis=-1, keepdims=True)
+            blended = (1.0 - self.logit_blend) * base_logits + self.logit_blend * refined_logits
+            return mx.where(same_top, blended, base_logits)
+
+        raise ValueError(f"Unsupported logit_fusion {self.logit_fusion!r}. Use blend, confidence_gate, or agreement_blend.")
+
     def __call__(
         self,
         input_ids: mx.array,
@@ -462,13 +497,11 @@ class QwenHrmForCausalLM(nn.Module):
 
         base_hidden, refined_hidden = self.model(input_ids, position_offset=position_offset, cache=cache)
         base_logits = self._project_logits(base_hidden)
-        if self.logit_blend <= 0:
+        if self.logit_fusion == "blend" and self.logit_blend <= 0:
             return base_logits
 
         refined_logits = self._project_logits(refined_hidden)
-        if self.logit_blend >= 1:
-            return refined_logits
-        return (1.0 - self.logit_blend) * base_logits + self.logit_blend * refined_logits
+        return self._fuse_logits(base_logits, refined_logits)
 
     def prefill(self, input_ids: mx.array, cache: dict[str, Any] | None = None) -> mx.array:
         if cache is None:

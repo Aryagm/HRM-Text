@@ -133,3 +133,6 @@ Additional stability knobs:
 - `--refined-delta-scale` scales the final hidden delta from the base model to
   the refined state before logits are projected.
 - `--split-index` overrides the automatic `L`/`H` layer split.
+- `--logit-fusion` can test alternate output fusion. Current tracked options are
+  `blend`, `confidence_gate`, and `agreement_blend`; the gate variants did not
+  preserve the corrected-probe gains, so `blend` remains the default.

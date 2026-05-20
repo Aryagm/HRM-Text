@@ -108,9 +108,11 @@ const sweep06 = await readRows("sweep_qwen3_0_6b_expanded_focused.csv").catch(()
 const split06 = await readRows("sweep_qwen3_0_6b_split.csv").catch(() => []);
 const split17 = await readRows("sweep_qwen3_1_7b_split.csv").catch(() => []);
 const tight17 = await readRows("sweep_qwen3_1_7b_split10_tight.csv").catch(() => []);
+const fusion06 = await readRows("sweep_qwen3_0_6b_fusion.csv").catch(() => []);
+const fusion17 = await readRows("sweep_qwen3_1_7b_fusion.csv").catch(() => []);
 const finalRows = [...final06, ...final17];
 const finalRuns = uniqueRuns(finalRows);
-const sweepRuns = uniqueRuns([...sweep06, ...split06, ...split17, ...tight17]);
+const sweepRuns = uniqueRuns([...sweep06, ...split06, ...split17, ...tight17, ...fusion06, ...fusion17]);
 
 const workbook = Workbook.create();
 const summary = workbook.worksheets.add("Summary");
@@ -170,6 +172,8 @@ writeTable(
     "Update Mix",
     "Delta Scale",
     "Split",
+    "Fusion",
+    "Threshold",
   ],
   finalRuns.map((r) => [
     modelLabel(r.model),
@@ -187,6 +191,8 @@ writeTable(
     asNumber(r.update_mix_l),
     asNumber(r.refined_delta_scale),
     asNumber(r.split_index),
+    r.logit_fusion || "blend",
+    asNumber(r.fusion_threshold || 0),
   ]),
 );
 finalSheet.getRange("E2:E20").format.numberFormat = "0.0%";
@@ -231,6 +237,8 @@ writeTable(
     "Update Mix",
     "Delta Scale",
     "Split",
+    "Fusion",
+    "Threshold",
     "Source",
   ],
   sweepRuns.map((r) => [
@@ -250,13 +258,15 @@ writeTable(
     asNumber(r.update_mix_l),
     asNumber(r.refined_delta_scale),
     asNumber(r.split_index),
+    r.logit_fusion || "blend",
+    asNumber(r.fusion_threshold || 0),
     r.source_file,
   ]),
 );
 sweepSheet.getRange("F2:F500").format.numberFormat = "0.0%";
 sweepSheet.getRange("G2:G500").format.numberFormat = "0.00";
 
-notes.getRange("A1:B8").values = [
+notes.getRange("A1:B9").values = [
   ["Item", "Note"],
   ["Benchmark", "Closed-form multiple-choice probe scored by candidate letter log-probability."],
   ["Current wins", "Qwen3-0.6B-4bit improves from 5/17 to 7/17 with split 14; Qwen3-1.7B-4bit improves from 10/17 to 11/17 with split 10."],
@@ -264,17 +274,18 @@ notes.getRange("A1:B8").values = [
   ["Cost", "HRM is slower because it adds warm split and recurrent passes per scored candidate/token."],
   ["Correction", "Earlier sequence answer was corrected from 80 to 67 before final runs."],
   ["Interpretation", "No-training recurrence helps the smaller model on this probe, but this is not yet broad HRM-level performance."],
-  ["Next", "Need larger held-out probe and a calibrated verifier/reranker or light adapter training for stronger claims."],
+  ["Fusion finding", "Confidence-gated and agreement-gated logit fusion did not preserve the gains; fixed logit blending remains best on the current probe."],
+  ["Next", "Need larger held-out probe and a stronger no-training verifier/reranker strategy, or light adapter calibration, for stronger claims."],
 ];
 notes.getRange("A1:B1").format = {
   fill: { type: "solid", color: "#1F4E78" },
   font: { color: "#FFFFFF", bold: true },
 };
-notes.getRange("A1:B8").format.wrapText = true;
-notes.getRange("A1:B8").format.autofitColumns();
+notes.getRange("A1:B9").format.wrapText = true;
+notes.getRange("A1:B9").format.autofitColumns();
 
 for (const sheet of [summary, finalSheet, casesSheet, sweepSheet, notes]) {
-  sheet.getRange("A1:O200").format.verticalAlignment = "top";
+  sheet.getRange("A1:Q300").format.verticalAlignment = "top";
 }
 
 await fs.mkdir(OUT_DIR, { recursive: true });

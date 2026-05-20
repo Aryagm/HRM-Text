@@ -163,10 +163,16 @@ def evaluate_mode(
     update_mix_h: float | None,
     refined_delta_scale: float | None,
     split_index: int | None,
+    logit_fusion: str | None,
+    fusion_threshold: float | None,
 ) -> tuple[int, list[tuple[Case, str, dict[str, float]]]]:
     model.model.H_cycles = h_cycles
     model.model.L_cycles = l_cycles
     model.logit_blend = logit_blend
+    if logit_fusion is not None:
+        model.logit_fusion = logit_fusion
+    if fusion_threshold is not None:
+        model.fusion_threshold = fusion_threshold
     if split_index is not None:
         model.model.config.split_index = split_index
     if alpha_l is not None:
@@ -209,6 +215,8 @@ def main() -> None:
     parser.add_argument("--update-mix-h", type=float, default=None)
     parser.add_argument("--refined-delta-scale", type=float, default=None)
     parser.add_argument("--split-index", type=int, default=None, help="Number of lower layers assigned to L.")
+    parser.add_argument("--logit-fusion", choices=("blend", "confidence_gate", "agreement_blend"), default=None)
+    parser.add_argument("--fusion-threshold", type=float, default=None)
     parser.add_argument("--include-base", action="store_true")
     args = parser.parse_args()
 
@@ -237,6 +245,8 @@ def main() -> None:
             update_mix_h=args.update_mix_h,
             refined_delta_scale=args.refined_delta_scale,
             split_index=args.split_index,
+            logit_fusion=args.logit_fusion,
+            fusion_threshold=args.fusion_threshold,
         )
         print(f"== {label} ==")
         for case, prediction, scores in rows:
