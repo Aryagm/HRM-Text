@@ -360,6 +360,11 @@ Additional stability knobs:
   prior from each ARC answer score. Tracked options are `answer_prior` and
   `options_prior`; full-validation runs show `options_prior` is best so far for
   Qwen3-0.6B and `answer_prior` is best so far for Qwen3-1.7B.
+- `--calibration auto` applies the conservative transferred defaults:
+  Qwen3-0.6B uses `options_prior` at weight `1.0`, and Qwen3-1.7B uses
+  `answer_prior` at weight `1.0`. It deliberately avoids the Qwen3-1.7B
+  ARC-Challenge-tuned `1.7` weight because that setting failed to transfer to
+  ARC-Easy.
 - `--logit-fusion` can test alternate output fusion. Current tracked options are
   `blend`, `delta`, `prob_blend`, `confidence_gate`, and `agreement_blend`.
   Confidence-gated, agreement-gated, probability-space, and extrapolated-delta

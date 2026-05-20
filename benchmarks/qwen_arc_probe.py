@@ -62,6 +62,15 @@ def build_calibration_prompt(case: ArcCase, calibration: str) -> str | None:
     raise ValueError(f"Unsupported calibration {calibration!r}")
 
 
+def auto_calibration_for_model(model: str) -> tuple[str, float]:
+    model_lower = model.lower()
+    if "qwen3-0.6b" in model_lower or "qwen3_0_6b" in model_lower:
+        return "options_prior", 1.0
+    if "qwen3-1.7b" in model_lower or "qwen3_1_7b" in model_lower:
+        return "answer_prior", 1.0
+    return "none", 0.0
+
+
 def candidate_continuation(label: str, text: str, answer_scoring: str) -> str:
     if answer_scoring == "label":
         return label
@@ -187,11 +196,14 @@ def main() -> None:
     )
     parser.add_argument(
         "--calibration",
-        choices=("none", "answer_prior", "options_prior"),
+        choices=("none", "answer_prior", "options_prior", "auto"),
         default="none",
-        help="Subtract a no-training prior score from each candidate.",
+        help=(
+            "Subtract a no-training prior score from each candidate. "
+            "auto uses transferred Qwen defaults: 0.6B options_prior@1.0, 1.7B answer_prior@1.0."
+        ),
     )
-    parser.add_argument("--calibration-weight", type=float, default=1.0)
+    parser.add_argument("--calibration-weight", type=float, default=None)
     parser.add_argument(
         "--logit-fusion",
         choices=("blend", "delta", "prob_blend", "confidence_gate", "agreement_blend"),
@@ -207,7 +219,16 @@ def main() -> None:
     parser.add_argument("--split-index", type=int, default=None)
     parser.add_argument("--out", type=Path, required=True)
     args = parser.parse_args()
-    effective_calibration_weight = 0.0 if args.calibration == "none" else args.calibration_weight
+    if args.calibration == "auto":
+        effective_calibration, default_weight = auto_calibration_for_model(args.model)
+        effective_calibration_weight = default_weight if args.calibration_weight is None else args.calibration_weight
+    else:
+        effective_calibration = args.calibration
+        effective_calibration_weight = (
+            0.0
+            if args.calibration == "none"
+            else (1.0 if args.calibration_weight is None else args.calibration_weight)
+        )
 
     cases = load_arc_cases(args.arc_config, args.split, args.limit)
     tokenizer = AutoTokenizer.from_pretrained(args.model, use_fast=True, trust_remote_code=True)
@@ -233,7 +254,7 @@ def main() -> None:
         tokenizer,
         cases,
         answer_scoring=args.answer_scoring,
-        calibration=args.calibration,
+        calibration=effective_calibration,
         calibration_weight=effective_calibration_weight,
     )
     elapsed = time.perf_counter() - start
@@ -292,7 +313,7 @@ def main() -> None:
                     "limit": args.limit,
                     "mode": args.mode,
                     "answer_scoring": args.answer_scoring,
-                    "calibration": args.calibration,
+                    "calibration": effective_calibration,
                     "calibration_weight": effective_calibration_weight,
                     "logit_fusion": model.logit_fusion,
                     "logit_blend": model.logit_blend,
@@ -312,7 +333,7 @@ def main() -> None:
             )
     print(
         f"{args.model} {args.mode} {args.arc_config} {args.split}[:{args.limit}] "
-        f"{args.answer_scoring} calibration={args.calibration}: {correct}/{total}"
+        f"{args.answer_scoring} calibration={effective_calibration}@{effective_calibration_weight}: {correct}/{total}"
     )
     print(f"wrote {args.out}")
 

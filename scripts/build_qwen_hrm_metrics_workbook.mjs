@@ -798,7 +798,7 @@ writeTable(
 arcCalibrationTransferSheet.getRange("J2:J50").format.numberFormat = "0.0%";
 arcCalibrationTransferSheet.getRange("P2:P50").format.numberFormat = "0.0%";
 
-notes.getRange("A1:B24").values = [
+notes.getRange("A1:B25").values = [
   ["Item", "Note"],
   ["Benchmark", "Closed-form multiple-choice probe scored by candidate letter log-probability."],
   ["Current wins", "Qwen3-0.6B-4bit improves from 5/17 to 7/17 with split 14; Qwen3-1.7B-4bit improves from 10/17 to 11/17 with split 10."],
@@ -816,6 +816,7 @@ notes.getRange("A1:B24").values = [
   ["ARC calibration sweep", "Post-hoc calibration-weight sweeps from saved raw/prior scores show Qwen3-0.6B is best at weight 1.0 on full validation, while Qwen3-1.7B answer-prior weight 1.7 reaches 216/299 for both base and agreement_blend. Treat 1.7 as tuned on validation until tested elsewhere."],
   ["ARC calibration transfer", "Transfer checks fit the calibration weight on one saved score file and evaluate a separate file. ARC-Challenge validation[:50] to validation[50:100] gives +3 for Qwen3-0.6B and +2 for Qwen3-1.7B. ARC-Challenge full to ARC-Easy full gives +7 for Qwen3-0.6B but +0 for Qwen3-1.7B."],
   ["ARC-Easy transfer", "On full ARC-Easy validation, Qwen3-0.6B option-prior calibration transfers from 348/570 to 355/570 at weight 1.0; a post-hoc weight sweep reaches 365/570 at weight 0.8 for both base and agreement_blend. Qwen3-1.7B answer-prior calibration is not robust: weight 1.0 is 488/570 and the best swept weight 0.4 reaches only 490/570."],
+  ["ARC auto policy", "benchmarks/qwen_arc_probe.py now supports --calibration auto. It applies the conservative transferred policy: Qwen3-0.6B uses options_prior at weight 1.0; Qwen3-1.7B uses answer_prior at weight 1.0 and avoids the ARC-Challenge-tuned 1.7 weight."],
   ["ARC scoring surfaces", "Choice-text scoring is much worse than answer-letter scoring on ARC slices. Qwen3-1.7B label+text scoring ties the 37/50 first-slice base score, and a margin switch reaches 38/50 on validation[:50] but only ties base at 33/50 on validation[50:100]. Treat as exploratory, not solid improvement."],
   ["HRM-Text comparison", "The original HRM-Text exact run used the wrong final-answer prompt/extraction and too small a token cap. Corrected boxed-prompt runs score 16/17 for both 4-bit and BF16."],
   ["Cost", "HRM is slower because it adds warm split and recurrent passes per scored candidate/token."],
@@ -828,8 +829,8 @@ notes.getRange("A1:B1").format = {
   fill: { type: "solid", color: "#1F4E78" },
   font: { color: "#FFFFFF", bold: true },
 };
-notes.getRange("A1:B24").format.wrapText = true;
-notes.getRange("A1:B24").format.autofitColumns();
+notes.getRange("A1:B25").format.wrapText = true;
+notes.getRange("A1:B25").format.autofitColumns();
 
 for (const sheet of [
   summary,
