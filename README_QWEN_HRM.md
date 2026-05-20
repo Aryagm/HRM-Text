@@ -228,6 +228,17 @@ Validation on the next ARC slice rejected this rule:
 So the margin threshold was overfit to `validation[:50]`; do not use it as a
 production rule.
 
+Targeted 0.6B ARC architecture checks also stayed flat:
+
+| Run | Correct |
+| --- | ---: |
+| Qwen3-0.6B agreement gate, default H=1 split | 21 / 50 |
+| Qwen3-0.6B agreement gate, H=2 | 21 / 50 |
+| Qwen3-0.6B agreement gate, split_index=10 | 21 / 50 |
+
+So neither deeper recurrence nor moving the L/H split earlier improved the
+dataset-backed 0.6B ARC slice.
+
 For broader evaluation, the repo's standard benchmark runner now has an MLX
 Qwen-HRM engine. Use it for small Apple Silicon slices before spending time on
 full benchmark passes:

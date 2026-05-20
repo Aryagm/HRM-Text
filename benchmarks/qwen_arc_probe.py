@@ -69,22 +69,36 @@ def score_candidate(model: QwenHrmForCausalLM, tokenizer, prompt_ids: list[int],
     return score / max(1, len(candidate_ids))
 
 
-def configure_model(model: QwenHrmForCausalLM, mode: str, logit_fusion: str, logit_blend: float) -> None:
+def configure_model(
+    model: QwenHrmForCausalLM,
+    mode: str,
+    logit_fusion: str,
+    logit_blend: float,
+    h_cycles: int,
+    l_cycles: int,
+    alpha_l: float,
+    alpha_h: float,
+    beta_l: float,
+    beta_h: float,
+    split_index: int | None,
+) -> None:
     if mode == "base":
         model.model.H_cycles = 0
         model.model.L_cycles = 1
         model.logit_blend = 0.0
         model.logit_fusion = "blend"
         return
-    model.model.H_cycles = 1
-    model.model.L_cycles = 1
-    model.model.alpha_l = 0.03
-    model.model.alpha_h = 0.05
-    model.model.beta_l = 0.01
-    model.model.beta_h = 0.01
+    model.model.H_cycles = h_cycles
+    model.model.L_cycles = l_cycles
+    model.model.alpha_l = alpha_l
+    model.model.alpha_h = alpha_h
+    model.model.beta_l = beta_l
+    model.model.beta_h = beta_h
     model.model.update_mix_l = 1.0
     model.model.update_mix_h = 1.0
     model.model.refined_delta_scale = 1.0
+    if split_index is not None:
+        model.model.config.split_index = split_index
     model.logit_fusion = logit_fusion
     model.logit_blend = logit_blend
     model.fusion_threshold = 0.0
@@ -124,13 +138,32 @@ def main() -> None:
         default="blend",
     )
     parser.add_argument("--logit-blend", type=float, default=0.2)
+    parser.add_argument("--h-cycles", type=int, default=1)
+    parser.add_argument("--l-cycles", type=int, default=1)
+    parser.add_argument("--alpha-l", type=float, default=0.03)
+    parser.add_argument("--alpha-h", type=float, default=0.05)
+    parser.add_argument("--beta-l", type=float, default=0.01)
+    parser.add_argument("--beta-h", type=float, default=0.01)
+    parser.add_argument("--split-index", type=int, default=None)
     parser.add_argument("--out", type=Path, required=True)
     args = parser.parse_args()
 
     cases = load_arc_cases(args.split, args.limit)
     tokenizer = AutoTokenizer.from_pretrained(args.model, use_fast=True, trust_remote_code=True)
     model = QwenHrmForCausalLM.from_pretrained(args.model)
-    configure_model(model, args.mode, args.logit_fusion, args.logit_blend)
+    configure_model(
+        model,
+        args.mode,
+        args.logit_fusion,
+        args.logit_blend,
+        args.h_cycles,
+        args.l_cycles,
+        args.alpha_l,
+        args.alpha_h,
+        args.beta_l,
+        args.beta_h,
+        args.split_index,
+    )
     mx.eval(model.parameters())
 
     start = time.perf_counter()
@@ -146,6 +179,13 @@ def main() -> None:
         "mode",
         "logit_fusion",
         "logit_blend",
+        "h_cycles",
+        "l_cycles",
+        "alpha_l",
+        "alpha_h",
+        "beta_l",
+        "beta_h",
+        "split_index",
         "correct",
         "total",
         "accuracy",
@@ -172,6 +212,13 @@ def main() -> None:
                     "mode": args.mode,
                     "logit_fusion": model.logit_fusion,
                     "logit_blend": model.logit_blend,
+                    "h_cycles": model.model.H_cycles,
+                    "l_cycles": model.model.L_cycles,
+                    "alpha_l": model.model.alpha_l,
+                    "alpha_h": model.model.alpha_h,
+                    "beta_l": model.model.beta_l,
+                    "beta_h": model.model.beta_h,
+                    "split_index": model.model.config.split_index,
                     "correct": correct,
                     "total": total,
                     "accuracy": correct / max(1, total),

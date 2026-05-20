@@ -203,6 +203,8 @@ const arcRows = [
   ...(await readRows("arc_qwen3_0_6b_base_validation50.csv").catch(() => [])),
   ...(await readRows("arc_qwen3_0_6b_hrm_validation50.csv").catch(() => [])),
   ...(await readRows("arc_qwen3_0_6b_hrm_agreement_validation50.csv").catch(() => [])),
+  ...(await readRows("arc_qwen3_0_6b_hrm_agreement_h2_validation50.csv").catch(() => [])),
+  ...(await readRows("arc_qwen3_0_6b_hrm_agreement_split10_validation50.csv").catch(() => [])),
   ...(await readRows("arc_qwen3_0_6b_base_validation50_100.csv").catch(() => [])),
   ...(await readRows("arc_qwen3_0_6b_hrm_validation50_100.csv").catch(() => [])),
   ...(await readRows("arc_qwen3_1_7b_base_validation50.csv").catch(() => [])),
@@ -536,7 +538,7 @@ rerankSheet.getRange("H2:H50").format.numberFormat = "0.0%";
 writeTable(
   arcSheet,
   "A1",
-  ["Model", "Split", "Limit", "Mode", "Fusion", "Blend", "Correct", "Total", "Accuracy", "Elapsed s", "Source"],
+  ["Model", "Split", "Limit", "Mode", "Fusion", "Blend", "H", "L", "Split Index", "Correct", "Total", "Accuracy", "Elapsed s", "Source"],
   arcRuns.map((r) => [
     modelLabel(r.model),
     r.split,
@@ -544,6 +546,9 @@ writeTable(
     r.mode,
     r.logit_fusion,
     asNumber(r.logit_blend),
+    asNumber(r.h_cycles),
+    asNumber(r.l_cycles),
+    asNumber(r.split_index),
     asNumber(r.correct),
     asNumber(r.total),
     asNumber(r.accuracy),
@@ -551,8 +556,8 @@ writeTable(
     r.source_file,
   ]),
 );
-arcSheet.getRange("I2:I50").format.numberFormat = "0.0%";
-arcSheet.getRange("J2:J50").format.numberFormat = "0.00";
+arcSheet.getRange("L2:L50").format.numberFormat = "0.0%";
+arcSheet.getRange("M2:M50").format.numberFormat = "0.00";
 
 writeTable(
   arcEnsembleSheet,
@@ -571,7 +576,7 @@ writeTable(
 );
 arcEnsembleSheet.getRange("G2:G50").format.numberFormat = "0.0%";
 
-notes.getRange("A1:B16").values = [
+notes.getRange("A1:B17").values = [
   ["Item", "Note"],
   ["Benchmark", "Closed-form multiple-choice probe scored by candidate letter log-probability."],
   ["Current wins", "Qwen3-0.6B-4bit improves from 5/17 to 7/17 with split 14; Qwen3-1.7B-4bit improves from 10/17 to 11/17 with split 10."],
@@ -582,6 +587,7 @@ notes.getRange("A1:B16").values = [
   ["Candidate rerank", "Saved-output candidate reranking found an 11/17 oracle union across raw/chat candidates, but naive yes/no and answer-likelihood rerankers selected only 6/17. Need a stronger verifier."],
   ["ARC-Challenge slice", "On ARC-Challenge validation[:50], Qwen3-0.6B is flat at 21/50 for base, fixed blend, and agreement_blend; Qwen3-1.7B base is 37/50, fixed blend is 35/50, and agreement_blend recovers 37/50."],
   ["ARC margin ensemble", "A base-margin switch to HRM when base top-two margin <= 0.25 improves Qwen3-0.6B validation[:50] from 21/50 to 23/50, but drops validation[50:100] from 17/50 to 16/50 and Qwen3-1.7B from 37/50 to 36/50. Treat as overfit."],
+  ["ARC architecture probes", "Qwen3-0.6B agreement_blend with H=2 and with split_index=10 both remained 21/50 on ARC validation[:50]. Deeper recurrence or a smaller L split did not improve the dataset-backed slice."],
   ["HRM-Text comparison", "The original HRM-Text exact run used the wrong final-answer prompt/extraction and too small a token cap. Corrected boxed-prompt runs score 16/17 for both 4-bit and BF16."],
   ["Cost", "HRM is slower because it adds warm split and recurrent passes per scored candidate/token."],
   ["Correction", "Earlier sequence answer was corrected from 80 to 67 before final runs."],
@@ -593,8 +599,8 @@ notes.getRange("A1:B1").format = {
   fill: { type: "solid", color: "#1F4E78" },
   font: { color: "#FFFFFF", bold: true },
 };
-notes.getRange("A1:B16").format.wrapText = true;
-notes.getRange("A1:B16").format.autofitColumns();
+notes.getRange("A1:B17").format.wrapText = true;
+notes.getRange("A1:B17").format.autofitColumns();
 
 for (const sheet of [
   summary,
@@ -623,7 +629,7 @@ console.log(errors.ndjson);
 await workbook.render({ sheetName: "Summary", range: "A1:I16", scale: 2 });
 await workbook.render({ sheetName: "Exact Runs", range: "A1:N14", scale: 2 });
 await workbook.render({ sheetName: "Rerank Runs", range: "A1:K8", scale: 2 });
-await workbook.render({ sheetName: "ARC Runs", range: "A1:K6", scale: 2 });
+await workbook.render({ sheetName: "ARC Runs", range: "A1:N9", scale: 2 });
 await workbook.render({ sheetName: "ARC Ensembles", range: "A1:H5", scale: 2 });
 const output = await SpreadsheetFile.exportXlsx(workbook);
 await output.save(OUT_FILE);
