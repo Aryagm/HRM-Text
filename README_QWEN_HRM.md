@@ -217,9 +217,16 @@ Exploratory ARC margin switch:
 | Qwen3-1.7B Base | 37 / 50 |
 | Qwen3-1.7B HRM when base margin <= 0.25 | 36 / 50 |
 
-This suggests the HRM path can help small-model low-confidence MC cases, but the
-threshold is not model-general and was selected from the same ARC slice. Treat it
-as a hypothesis for validation, not a production rule.
+Validation on the next ARC slice rejected this rule:
+
+| Run | Correct |
+| --- | ---: |
+| Qwen3-0.6B Base, validation[50:100] | 17 / 50 |
+| Qwen3-0.6B fixed HRM, validation[50:100] | 17 / 50 |
+| Qwen3-0.6B margin switch, validation[50:100] | 16 / 50 |
+
+So the margin threshold was overfit to `validation[:50]`; do not use it as a
+production rule.
 
 For broader evaluation, the repo's standard benchmark runner now has an MLX
 Qwen-HRM engine. Use it for small Apple Silicon slices before spending time on

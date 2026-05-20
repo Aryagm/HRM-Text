@@ -203,12 +203,15 @@ const arcRows = [
   ...(await readRows("arc_qwen3_0_6b_base_validation50.csv").catch(() => [])),
   ...(await readRows("arc_qwen3_0_6b_hrm_validation50.csv").catch(() => [])),
   ...(await readRows("arc_qwen3_0_6b_hrm_agreement_validation50.csv").catch(() => [])),
+  ...(await readRows("arc_qwen3_0_6b_base_validation50_100.csv").catch(() => [])),
+  ...(await readRows("arc_qwen3_0_6b_hrm_validation50_100.csv").catch(() => [])),
   ...(await readRows("arc_qwen3_1_7b_base_validation50.csv").catch(() => [])),
   ...(await readRows("arc_qwen3_1_7b_hrm_validation50.csv").catch(() => [])),
   ...(await readRows("arc_qwen3_1_7b_hrm_agreement_validation50.csv").catch(() => [])),
 ];
 const arcEnsembleRows = [
   ...(await readRows("arc_qwen3_0_6b_margin_ensemble_validation50.csv").catch(() => [])),
+  ...(await readRows("arc_qwen3_0_6b_margin_ensemble_validation50_100.csv").catch(() => [])),
   ...(await readRows("arc_qwen3_1_7b_margin_ensemble_validation50.csv").catch(() => [])),
 ];
 const finalRows = [...final06, ...final17];
@@ -578,7 +581,7 @@ notes.getRange("A1:B16").values = [
   ["Delayed fusion", "Final-answer-triggered HRM fusion also recovers the 6/17 base score on Qwen3-1.7B chat-template boxed runs. It is safer than full-sequence fixed blending but still not above base."],
   ["Candidate rerank", "Saved-output candidate reranking found an 11/17 oracle union across raw/chat candidates, but naive yes/no and answer-likelihood rerankers selected only 6/17. Need a stronger verifier."],
   ["ARC-Challenge slice", "On ARC-Challenge validation[:50], Qwen3-0.6B is flat at 21/50 for base, fixed blend, and agreement_blend; Qwen3-1.7B base is 37/50, fixed blend is 35/50, and agreement_blend recovers 37/50."],
-  ["ARC margin ensemble", "A base-margin switch to HRM when base top-two margin <= 0.25 improves Qwen3-0.6B from 21/50 to 23/50, but drops Qwen3-1.7B from 37/50 to 36/50. Treat as model-specific and unvalidated."],
+  ["ARC margin ensemble", "A base-margin switch to HRM when base top-two margin <= 0.25 improves Qwen3-0.6B validation[:50] from 21/50 to 23/50, but drops validation[50:100] from 17/50 to 16/50 and Qwen3-1.7B from 37/50 to 36/50. Treat as overfit."],
   ["HRM-Text comparison", "The original HRM-Text exact run used the wrong final-answer prompt/extraction and too small a token cap. Corrected boxed-prompt runs score 16/17 for both 4-bit and BF16."],
   ["Cost", "HRM is slower because it adds warm split and recurrent passes per scored candidate/token."],
   ["Correction", "Earlier sequence answer was corrected from 80 to 67 before final runs."],
