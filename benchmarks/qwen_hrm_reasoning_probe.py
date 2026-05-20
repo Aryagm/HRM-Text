@@ -215,7 +215,11 @@ def main() -> None:
     parser.add_argument("--update-mix-h", type=float, default=None)
     parser.add_argument("--refined-delta-scale", type=float, default=None)
     parser.add_argument("--split-index", type=int, default=None, help="Number of lower layers assigned to L.")
-    parser.add_argument("--logit-fusion", choices=("blend", "confidence_gate", "agreement_blend"), default=None)
+    parser.add_argument(
+        "--logit-fusion",
+        choices=("blend", "delta", "prob_blend", "confidence_gate", "agreement_blend"),
+        default=None,
+    )
     parser.add_argument("--fusion-threshold", type=float, default=None)
     parser.add_argument("--include-base", action="store_true")
     args = parser.parse_args()

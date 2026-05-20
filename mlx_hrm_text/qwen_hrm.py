@@ -458,6 +458,22 @@ class QwenHrmForCausalLM(nn.Module):
                 return refined_logits
             return (1.0 - self.logit_blend) * base_logits + self.logit_blend * refined_logits
 
+        if self.logit_fusion == "delta":
+            return base_logits + self.logit_blend * (refined_logits - base_logits)
+
+        if self.logit_fusion == "prob_blend":
+            if self.logit_blend <= 0:
+                return base_logits
+            if self.logit_blend >= 1:
+                return refined_logits
+            base_log_probs = base_logits.astype(mx.float32) - mx.logsumexp(base_logits.astype(mx.float32), axis=-1, keepdims=True)
+            refined_log_probs = refined_logits.astype(mx.float32) - mx.logsumexp(
+                refined_logits.astype(mx.float32), axis=-1, keepdims=True
+            )
+            base_probs = mx.exp(base_log_probs)
+            refined_probs = mx.exp(refined_log_probs)
+            return mx.log((1.0 - self.logit_blend) * base_probs + self.logit_blend * refined_probs + 1e-30)
+
         if self.logit_fusion == "confidence_gate":
             base_log_probs = base_logits.astype(mx.float32) - mx.logsumexp(base_logits.astype(mx.float32), axis=-1, keepdims=True)
             refined_log_probs = refined_logits.astype(mx.float32) - mx.logsumexp(
@@ -477,7 +493,10 @@ class QwenHrmForCausalLM(nn.Module):
             blended = (1.0 - self.logit_blend) * base_logits + self.logit_blend * refined_logits
             return mx.where(same_top, blended, base_logits)
 
-        raise ValueError(f"Unsupported logit_fusion {self.logit_fusion!r}. Use blend, confidence_gate, or agreement_blend.")
+        raise ValueError(
+            f"Unsupported logit_fusion {self.logit_fusion!r}. "
+            "Use blend, delta, prob_blend, confidence_gate, or agreement_blend."
+        )
 
     def __call__(
         self,

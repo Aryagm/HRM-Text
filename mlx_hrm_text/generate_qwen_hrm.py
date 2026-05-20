@@ -83,7 +83,11 @@ def main() -> None:
     parser.add_argument("--refined-delta-scale", type=float, default=None)
     parser.add_argument("--split-index", type=int, default=None, help="Number of lower layers assigned to L.")
     parser.add_argument("--logit-blend", type=float, default=None, help="0.0 is base model only, 1.0 is HRM logits only.")
-    parser.add_argument("--logit-fusion", choices=("blend", "confidence_gate", "agreement_blend"), default=None)
+    parser.add_argument(
+        "--logit-fusion",
+        choices=("blend", "delta", "prob_blend", "confidence_gate", "agreement_blend"),
+        default=None,
+    )
     parser.add_argument("--fusion-threshold", type=float, default=None)
     parser.add_argument("--revision", type=str, default=None)
     args = parser.parse_args()

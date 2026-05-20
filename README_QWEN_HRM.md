@@ -106,7 +106,7 @@ sweep gates/blend upward.
 
 ## Current Probe Results
 
-The benchmark script:
+The multiple-choice benchmark script:
 
 ```bash
 python benchmarks/qwen_hrm_reasoning_probe.py \
@@ -125,6 +125,37 @@ The current gain is real but narrow: the no-training recurrence improves both
 tracked checkpoints on this probe, with the stronger effect on 0.6B. Treat this
 as an experimental conversion baseline, not a broad HRM-level result yet.
 
+This MC set is a fast smoke/regression test, not an optimal reasoning benchmark.
+It is small, hand-built, and can reward candidate-option calibration instead of
+open-ended reasoning. To catch that, this branch also tracks a stricter
+exact-answer generative probe:
+
+```bash
+python benchmarks/exact_answer_probe.py \
+  --engine qwen \
+  --model mlx-community/Qwen3-1.7B-4bit \
+  --mode hrm \
+  --out outputs/qwen_hrm_metrics/exact_qwen3_1_7b_hrm.csv \
+  --max-tokens 128
+```
+
+Current exact-answer results:
+
+| Model | Mode | Correct |
+| --- | --- | ---: |
+| Qwen3-0.6B-4bit | Base | 1 / 17 |
+| Qwen3-0.6B-4bit | Qwen-HRM | 2 / 17 |
+| Qwen3-1.7B-4bit | Base | 4 / 17 |
+| Qwen3-1.7B-4bit | Qwen-HRM | 5 / 17 |
+| HRM-Text-1B MLX 4-bit | Native HRM-Text | 3 / 17 |
+| HRM-Text-1B MLX BF16 | Native HRM-Text | 1 / 17 |
+
+The exact-answer probe supports the same direction as the MC probe, but it also
+shows the current conversion is far from a decisive HRM-level jump. The HRM-Text
+numbers are useful as a local comparison, but they are prompt-sensitive because
+the native HRM-Text model appears to use different formatting and task
+conventions than Qwen chat checkpoints.
+
 Additional stability knobs:
 
 - `--update-mix-l` and `--update-mix-h` under-relax recurrent state updates.
@@ -134,5 +165,7 @@ Additional stability knobs:
   the refined state before logits are projected.
 - `--split-index` overrides the automatic `L`/`H` layer split.
 - `--logit-fusion` can test alternate output fusion. Current tracked options are
-  `blend`, `confidence_gate`, and `agreement_blend`; the gate variants did not
-  preserve the corrected-probe gains, so `blend` remains the default.
+  `blend`, `delta`, `prob_blend`, `confidence_gate`, and `agreement_blend`.
+  Confidence-gated, agreement-gated, probability-space, and extrapolated-delta
+  fusion did not beat fixed logit blending on the corrected probe, so `blend`
+  remains the default.

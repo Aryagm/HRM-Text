@@ -38,7 +38,11 @@ def main() -> None:
     parser.add_argument("--update-mix", default="0.25,0.5,1.0")
     parser.add_argument("--refined-delta-scale", default="0.25,0.5,1.0")
     parser.add_argument("--split-index", default="", help="Comma-separated L/H split points. Empty uses the checkpoint default.")
-    parser.add_argument("--logit-fusion", default="blend", help="Comma-separated fusion modes: blend,confidence_gate,agreement_blend.")
+    parser.add_argument(
+        "--logit-fusion",
+        default="blend",
+        help="Comma-separated fusion modes: blend,delta,prob_blend,confidence_gate,agreement_blend.",
+    )
     parser.add_argument("--fusion-threshold", default="0.0")
     parser.add_argument("--limit", type=int, default=None)
     args = parser.parse_args()
