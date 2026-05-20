@@ -271,21 +271,21 @@ headroom with a stronger answer-prior subtraction: weight `1.7` reaches
 `216 / 299` on full validation for both base and agreement-gated Qwen-HRM. Treat
 that weight as tuned on ARC validation until it is tested on another benchmark.
 
-ARC-Easy transfer check on `validation[:200]`:
+ARC-Easy transfer check:
 
 | Run | Correct |
 | --- | ---: |
-| Qwen3-0.6B Base | 121 / 200 |
-| Qwen3-0.6B Base, option-prior calibrated | 124 / 200 |
-| Qwen3-0.6B agreement gate, option-prior calibrated | 124 / 200 |
-| Qwen3-1.7B Base | 173 / 200 |
-| Qwen3-1.7B Base, answer-prior calibrated weight 1.0 | 173 / 200 |
-| Qwen3-1.7B Base, answer-prior calibrated weight 1.7 | 172 / 200 |
-| Qwen3-1.7B agreement gate, answer-prior calibrated weight 1.0 | 173 / 200 |
+| Qwen3-0.6B Base, validation full | 348 / 570 |
+| Qwen3-0.6B Base, option-prior calibrated, validation full | 355 / 570 |
+| Qwen3-0.6B agreement gate, option-prior calibrated, validation full | 355 / 570 |
+| Qwen3-1.7B Base, validation[:200] | 173 / 200 |
+| Qwen3-1.7B Base, answer-prior calibrated weight 1.0, validation[:200] | 173 / 200 |
+| Qwen3-1.7B Base, answer-prior calibrated weight 1.7, validation[:200] | 172 / 200 |
+| Qwen3-1.7B agreement gate, answer-prior calibrated weight 1.0, validation[:200] | 173 / 200 |
 
-So the 0.6B option-prior gain transfers modestly to ARC-Easy, while the 1.7B
-weight `1.7` setting looks ARC-Challenge-specific and should not be treated as a
-general default yet.
+So the 0.6B option-prior gain transfers modestly to full ARC-Easy validation,
+while the 1.7B weight `1.7` setting looks ARC-Challenge-specific and should not
+be treated as a general default yet.
 
 ARC scoring-surface follow-up:
 
