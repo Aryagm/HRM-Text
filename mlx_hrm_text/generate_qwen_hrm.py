@@ -34,11 +34,20 @@ def generate(
     max_tokens: int,
     temperature: float,
     eos_token_id: int | None,
+    fusion_after: tuple[str, ...] = (),
 ) -> str:
     encoded = tokenizer(prompt, return_tensors="np", return_attention_mask=False, add_special_tokens=False)
     prompt_ids = encoded["input_ids"][0].tolist()
     if not prompt_ids:
         raise ValueError("Prompt produced no tokens.")
+
+    original_fusion = model.logit_fusion
+    original_blend = model.logit_blend
+    original_threshold = model.fusion_threshold
+    use_delayed_fusion = bool(fusion_after)
+    if use_delayed_fusion:
+        model.logit_fusion = "blend"
+        model.logit_blend = 0.0
 
     max_length = len(prompt_ids) + max_tokens if model.use_static_cache else None
     cache = model.make_cache(max_length=max_length)
@@ -47,13 +56,26 @@ def generate(
 
     generated: list[int] = []
     position = len(prompt_ids)
+    fusion_active = not use_delayed_fusion
     for _ in range(max_tokens):
         if eos_token_id is not None and next_id == eos_token_id:
             break
         generated.append(next_id)
+        if use_delayed_fusion and not fusion_active:
+            decoded = tokenizer.decode(generated, skip_special_tokens=False)
+            if any(trigger in decoded for trigger in fusion_after):
+                model.logit_fusion = original_fusion
+                model.logit_blend = original_blend
+                model.fusion_threshold = original_threshold
+                fusion_active = True
         logits = model.decode_one(mx.array([next_id], dtype=mx.int32), position, cache)
         next_id = sample_next(logits[0], temperature)
         position += 1
+
+    if use_delayed_fusion:
+        model.logit_fusion = original_fusion
+        model.logit_blend = original_blend
+        model.fusion_threshold = original_threshold
 
     return tokenizer.decode(generated, skip_special_tokens=False)
 
@@ -89,6 +111,12 @@ def main() -> None:
         default=None,
     )
     parser.add_argument("--fusion-threshold", type=float, default=None)
+    parser.add_argument(
+        "--fusion-after",
+        type=str,
+        default="",
+        help="Comma-separated generated-text triggers that enable the configured HRM fusion after a base-prefix decode.",
+    )
     parser.add_argument("--revision", type=str, default=None)
     args = parser.parse_args()
 
@@ -134,6 +162,7 @@ def main() -> None:
             max_tokens=args.max_tokens,
             temperature=args.temperature,
             eos_token_id=tokenizer.eos_token_id,
+            fusion_after=tuple(item for item in args.fusion_after.split(",") if item),
         ),
         end="",
     )

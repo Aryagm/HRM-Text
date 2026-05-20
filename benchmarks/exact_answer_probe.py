@@ -216,6 +216,7 @@ def run_qwen(
     logit_blend: float | None,
     logit_fusion: str | None,
     fusion_threshold: float | None,
+    fusion_after: tuple[str, ...],
 ) -> list[dict[str, str | int | float | bool]]:
     import mlx.core as mx
     from transformers import AutoTokenizer
@@ -244,6 +245,7 @@ def run_qwen(
             max_tokens=max_tokens,
             temperature=0.0,
             eos_token_id=tokenizer.eos_token_id,
+            fusion_after=fusion_after,
         )
         elapsed = time.perf_counter() - start
         correct, extracted = is_correct(output, case.answers)
@@ -261,6 +263,7 @@ def run_qwen(
                 "logit_blend": model.logit_blend,
                 "logit_fusion": model.logit_fusion,
                 "fusion_threshold": model.fusion_threshold,
+                "fusion_after": "|".join(fusion_after),
                 "output": output,
             }
         )
@@ -305,6 +308,7 @@ def run_hrm_text(model_dir: str, max_tokens: int, dtype: str) -> list[dict[str, 
                 "logit_blend": "",
                 "logit_fusion": "",
                 "fusion_threshold": "",
+                "fusion_after": "",
                 "output": output,
             }
         )
@@ -334,6 +338,7 @@ def write_results(out: Path, model: str, mode: str, rows: list[dict[str, str | i
         "logit_blend",
         "logit_fusion",
         "fusion_threshold",
+        "fusion_after",
         "output",
     ]
     with out.open("w", newline="") as handle:
@@ -374,6 +379,11 @@ def main() -> None:
         default=None,
     )
     parser.add_argument("--qwen-fusion-threshold", type=float, default=None)
+    parser.add_argument(
+        "--qwen-fusion-after",
+        default="",
+        help="Comma-separated generated-text triggers that enable configured Qwen-HRM fusion after base-prefix decoding.",
+    )
     args = parser.parse_args()
 
     if args.engine == "qwen":
@@ -387,6 +397,7 @@ def main() -> None:
             args.qwen_logit_blend,
             args.qwen_logit_fusion,
             args.qwen_fusion_threshold,
+            tuple(item for item in args.qwen_fusion_after.split(",") if item),
         )
         write_results(args.out, args.model, args.mode, rows)
     else:

@@ -166,13 +166,17 @@ the generative exact score:
 | Qwen3-1.7B Qwen-HRM, chat + boxed, blend 0.05 | 5 / 17 |
 | Qwen3-1.7B Qwen-HRM, chat + boxed, agreement gate | 6 / 17 |
 | Qwen3-1.7B Qwen-HRM, chat + boxed, confidence gate | 6 / 17 |
+| Qwen3-1.7B Qwen-HRM, base prefix then final-answer blend | 6 / 17 |
+| Qwen3-1.7B Qwen-HRM, base prefix then final-answer confidence gate | 6 / 17 |
 
 That points to a real limitation in the current no-training fusion: fixed logit
 blending can improve candidate log-probability ranking while still damaging
 open-ended chat generation. Agreement/confidence gates recover the base score on
-this probe, so open-ended generation should use a base-anchored gate rather than
-blindly blend refined logits on every generated token. The next strategy should
-try verifier/reranker use of the refined path if we want gains above base.
+this probe, and delayed fusion recovers the base score by keeping the reasoning
+prefix on base logits until a final-answer marker appears. Open-ended generation
+should use base-anchored or final-answer-triggered fusion rather than blindly
+blend refined logits on every generated token. The next strategy should try a
+stronger verifier/reranker use of the refined path if we want gains above base.
 
 Candidate reranking was also tested over saved Qwen3-1.7B exact outputs. The
 combined raw/chat candidate pool has an oracle union of 11 / 17 correct cases,
@@ -216,3 +220,8 @@ Additional stability knobs:
   remains the scoring default. For open-ended generation, prefer
   `agreement_blend` or `confidence_gate` to avoid the fixed-blend degradation
   observed in chat-template exact-answer runs.
+- `--fusion-after` delays the configured Qwen-HRM fusion until generated text
+  contains one of the supplied comma-separated triggers. For exact-answer
+  generation, `--fusion-after '\boxed,Final Answer,final answer'` keeps the
+  reasoning prefix anchored to base logits and only enables HRM fusion near the
+  final answer.
