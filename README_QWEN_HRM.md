@@ -250,12 +250,20 @@ Full ARC-Challenge validation:
 | --- | ---: |
 | Qwen3-0.6B Base, validation full | 112 / 299 |
 | Qwen3-0.6B agreement gate, validation full | 112 / 299 |
+| Qwen3-0.6B Base, option-prior calibrated, validation full | 121 / 299 |
+| Qwen3-0.6B agreement gate, option-prior calibrated, validation full | 121 / 299 |
 | Qwen3-1.7B Base, validation full | 207 / 299 |
 | Qwen3-1.7B agreement gate, validation full | 207 / 299 |
+| Qwen3-1.7B Base, answer-prior calibrated, validation full | 211 / 299 |
+| Qwen3-1.7B agreement gate, answer-prior calibrated, validation full | 211 / 299 |
 
 This confirms that agreement-gated fusion preserves base behavior on the full
 validation split for both tested Qwen sizes, but does not create a measurable
 ARC improvement.
+No-training calibration does create a measurable ARC improvement: the smaller
+Qwen3-0.6B checkpoint benefits from subtracting an options-only prior, while
+Qwen3-1.7B benefits from subtracting a bare answer-label prior. Agreement-gated
+Qwen-HRM preserves both calibrated gains.
 
 ARC scoring-surface follow-up:
 
@@ -300,6 +308,10 @@ Additional stability knobs:
 - `--refined-delta-scale` scales the final hidden delta from the base model to
   the refined state before logits are projected.
 - `--split-index` overrides the automatic `L`/`H` layer split.
+- `--calibration` on `benchmarks/qwen_arc_probe.py` subtracts a no-training
+  prior from each ARC answer score. Tracked options are `answer_prior` and
+  `options_prior`; full-validation runs show `options_prior` is best so far for
+  Qwen3-0.6B and `answer_prior` is best so far for Qwen3-1.7B.
 - `--logit-fusion` can test alternate output fusion. Current tracked options are
   `blend`, `delta`, `prob_blend`, `confidence_gate`, and `agreement_blend`.
   Confidence-gated, agreement-gated, probability-space, and extrapolated-delta

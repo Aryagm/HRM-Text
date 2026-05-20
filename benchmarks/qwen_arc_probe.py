@@ -51,6 +51,17 @@ def build_prompt(case: ArcCase) -> str:
     return f"{case.question}\nOptions:\n{options}\nAnswer:"
 
 
+def build_calibration_prompt(case: ArcCase, calibration: str) -> str | None:
+    if calibration == "none":
+        return None
+    options = "\n".join(f"{label}. {text}" for label, text in case.choices)
+    if calibration == "answer_prior":
+        return "Answer:"
+    if calibration == "options_prior":
+        return f"Options:\n{options}\nAnswer:"
+    raise ValueError(f"Unsupported calibration {calibration!r}")
+
+
 def candidate_continuation(label: str, text: str, answer_scoring: str) -> str:
     if answer_scoring == "label":
         return label
@@ -120,15 +131,29 @@ def evaluate(
     cases: list[ArcCase],
     *,
     answer_scoring: str,
+    calibration: str,
+    calibration_weight: float,
 ) -> tuple[int, list[dict[str, object]]]:
     rows = []
     correct = 0
     for case in cases:
         prompt_ids = tokenizer(build_prompt(case), add_special_tokens=False)["input_ids"]
-        scores = {
-            label: score_candidate(model, tokenizer, prompt_ids, candidate_continuation(label, text, answer_scoring))
-            for label, text in case.choices
-        }
+        calibration_prompt = build_calibration_prompt(case, calibration)
+        calibration_ids = (
+            tokenizer(calibration_prompt, add_special_tokens=False)["input_ids"] if calibration_prompt is not None else None
+        )
+        scores = {}
+        calibration_scores = {}
+        raw_scores = {}
+        for label, text in case.choices:
+            continuation = candidate_continuation(label, text, answer_scoring)
+            raw_score = score_candidate(model, tokenizer, prompt_ids, continuation)
+            calibration_score = (
+                score_candidate(model, tokenizer, calibration_ids, continuation) if calibration_ids is not None else 0.0
+            )
+            raw_scores[label] = raw_score
+            calibration_scores[label] = calibration_score
+            scores[label] = raw_score - calibration_weight * calibration_score
         prediction = max(scores.items(), key=lambda item: item[1])[0]
         is_correct = prediction == case.answer
         correct += int(is_correct)
@@ -141,6 +166,8 @@ def evaluate(
         }
         for label, score in scores.items():
             row[f"score_{label}"] = score
+            row[f"raw_score_{label}"] = raw_scores[label]
+            row[f"calibration_score_{label}"] = calibration_scores[label]
         rows.append(row)
     return correct, rows
 
@@ -157,6 +184,13 @@ def main() -> None:
         default="label",
         help="Candidate continuation to score after the ARC prompt.",
     )
+    parser.add_argument(
+        "--calibration",
+        choices=("none", "answer_prior", "options_prior"),
+        default="none",
+        help="Subtract a no-training prior score from each candidate.",
+    )
+    parser.add_argument("--calibration-weight", type=float, default=1.0)
     parser.add_argument(
         "--logit-fusion",
         choices=("blend", "delta", "prob_blend", "confidence_gate", "agreement_blend"),
@@ -192,7 +226,14 @@ def main() -> None:
     mx.eval(model.parameters())
 
     start = time.perf_counter()
-    correct, rows = evaluate(model, tokenizer, cases, answer_scoring=args.answer_scoring)
+    correct, rows = evaluate(
+        model,
+        tokenizer,
+        cases,
+        answer_scoring=args.answer_scoring,
+        calibration=args.calibration,
+        calibration_weight=args.calibration_weight,
+    )
     elapsed = time.perf_counter() - start
     total = len(rows)
 
@@ -203,6 +244,8 @@ def main() -> None:
         "limit",
         "mode",
         "answer_scoring",
+        "calibration",
+        "calibration_weight",
         "logit_fusion",
         "logit_blend",
         "h_cycles",
@@ -222,21 +265,31 @@ def main() -> None:
         "prediction",
         "is_correct",
     ]
-    extra_fields = sorted({key for row in rows for key in row if key.startswith("score_")})
+    extra_fields = sorted(
+        {
+            key
+            for row in rows
+            for key in row
+            if key.startswith("score_") or key.startswith("raw_score_") or key.startswith("calibration_score_")
+        }
+    )
     args.out.parent.mkdir(parents=True, exist_ok=True)
     with args.out.open("w", newline="") as handle:
-        writer = csv.DictWriter(handle, fieldnames=fields + extra_fields)
+        writer = csv.DictWriter(handle, fieldnames=fields + extra_fields, lineterminator="\n")
         writer.writeheader()
         timestamp = datetime.now(timezone.utc).isoformat()
         for row in rows:
             writer.writerow(
                 {
+                    **{field: "NA" for field in extra_fields},
                     "timestamp_utc": timestamp,
                     "model": args.model,
                     "split": args.split,
                     "limit": args.limit,
                     "mode": args.mode,
                     "answer_scoring": args.answer_scoring,
+                    "calibration": args.calibration,
+                    "calibration_weight": args.calibration_weight,
                     "logit_fusion": model.logit_fusion,
                     "logit_blend": model.logit_blend,
                     "h_cycles": model.model.H_cycles,
@@ -255,7 +308,7 @@ def main() -> None:
             )
     print(
         f"{args.model} {args.mode} ARC-Challenge {args.split}[:{args.limit}] "
-        f"{args.answer_scoring}: {correct}/{total}"
+        f"{args.answer_scoring} calibration={args.calibration}: {correct}/{total}"
     )
     print(f"wrote {args.out}")
 

@@ -201,31 +201,44 @@ const rerankRows = [
 ];
 const arcRows = [
   ...(await readRows("arc_qwen3_0_6b_base_validation50.csv").catch(() => [])),
+  ...(await readRows("arc_qwen3_0_6b_base_calibrated_options_validation50.csv").catch(() => [])),
   ...(await readRows("arc_qwen3_0_6b_base_choice_text_validation50.csv").catch(() => [])),
   ...(await readRows("arc_qwen3_0_6b_base_label_text_validation50.csv").catch(() => [])),
   ...(await readRows("arc_qwen3_0_6b_hrm_validation50.csv").catch(() => [])),
   ...(await readRows("arc_qwen3_0_6b_hrm_refined_validation50.csv").catch(() => [])),
   ...(await readRows("arc_qwen3_0_6b_hrm_agreement_validation50.csv").catch(() => [])),
+  ...(await readRows("arc_qwen3_0_6b_hrm_agreement_calibrated_options_validation50.csv").catch(() => [])),
   ...(await readRows("arc_qwen3_0_6b_hrm_agreement_choice_text_validation50.csv").catch(() => [])),
   ...(await readRows("arc_qwen3_0_6b_hrm_agreement_label_text_validation50.csv").catch(() => [])),
   ...(await readRows("arc_qwen3_0_6b_hrm_agreement_h2_validation50.csv").catch(() => [])),
   ...(await readRows("arc_qwen3_0_6b_hrm_agreement_split10_validation50.csv").catch(() => [])),
   ...(await readRows("arc_qwen3_0_6b_base_validation50_100.csv").catch(() => [])),
+  ...(await readRows("arc_qwen3_0_6b_base_calibrated_options_validation50_100.csv").catch(() => [])),
   ...(await readRows("arc_qwen3_0_6b_hrm_validation50_100.csv").catch(() => [])),
+  ...(await readRows("arc_qwen3_0_6b_hrm_agreement_calibrated_options_validation50_100.csv").catch(() => [])),
   ...(await readRows("arc_qwen3_0_6b_base_validation299.csv").catch(() => [])),
+  ...(await readRows("arc_qwen3_0_6b_base_calibrated_options_validation299.csv").catch(() => [])),
   ...(await readRows("arc_qwen3_0_6b_hrm_agreement_validation299.csv").catch(() => [])),
+  ...(await readRows("arc_qwen3_0_6b_hrm_agreement_calibrated_options_validation299.csv").catch(() => [])),
   ...(await readRows("arc_qwen3_1_7b_base_validation50.csv").catch(() => [])),
+  ...(await readRows("arc_qwen3_1_7b_base_calibrated_answer_validation50.csv").catch(() => [])),
+  ...(await readRows("arc_qwen3_1_7b_base_calibrated_options_validation50.csv").catch(() => [])),
   ...(await readRows("arc_qwen3_1_7b_base_choice_text_validation50.csv").catch(() => [])),
   ...(await readRows("arc_qwen3_1_7b_base_label_text_validation50.csv").catch(() => [])),
   ...(await readRows("arc_qwen3_1_7b_hrm_validation50.csv").catch(() => [])),
   ...(await readRows("arc_qwen3_1_7b_hrm_refined_validation50.csv").catch(() => [])),
   ...(await readRows("arc_qwen3_1_7b_hrm_agreement_validation50.csv").catch(() => [])),
+  ...(await readRows("arc_qwen3_1_7b_hrm_agreement_calibrated_answer_validation50.csv").catch(() => [])),
   ...(await readRows("arc_qwen3_1_7b_hrm_agreement_choice_text_validation50.csv").catch(() => [])),
   ...(await readRows("arc_qwen3_1_7b_hrm_agreement_label_text_validation50.csv").catch(() => [])),
   ...(await readRows("arc_qwen3_1_7b_base_validation50_100.csv").catch(() => [])),
+  ...(await readRows("arc_qwen3_1_7b_base_calibrated_answer_validation50_100.csv").catch(() => [])),
   ...(await readRows("arc_qwen3_1_7b_base_label_text_validation50_100.csv").catch(() => [])),
+  ...(await readRows("arc_qwen3_1_7b_hrm_agreement_calibrated_answer_validation50_100.csv").catch(() => [])),
   ...(await readRows("arc_qwen3_1_7b_base_validation299.csv").catch(() => [])),
+  ...(await readRows("arc_qwen3_1_7b_base_calibrated_answer_validation299.csv").catch(() => [])),
   ...(await readRows("arc_qwen3_1_7b_hrm_agreement_validation299.csv").catch(() => [])),
+  ...(await readRows("arc_qwen3_1_7b_hrm_agreement_calibrated_answer_validation299.csv").catch(() => [])),
 ];
 const arcEnsembleRows = [
   ...(await readRows("arc_qwen3_0_6b_margin_ensemble_validation50.csv").catch(() => [])),
@@ -574,6 +587,8 @@ writeTable(
     "Limit",
     "Mode",
     "Answer Scoring",
+    "Calibration",
+    "Calib Weight",
     "Fusion",
     "Blend",
     "H",
@@ -591,6 +606,8 @@ writeTable(
     asNumber(r.limit),
     r.mode,
     r.answer_scoring || "label",
+    r.calibration || "none",
+    asNumber(r.calibration_weight || 0),
     r.logit_fusion,
     asNumber(r.logit_blend),
     asNumber(r.h_cycles),
@@ -603,8 +620,8 @@ writeTable(
     r.source_file,
   ]),
 );
-arcSheet.getRange("M2:M100").format.numberFormat = "0.0%";
-arcSheet.getRange("N2:N100").format.numberFormat = "0.00";
+arcSheet.getRange("O2:O150").format.numberFormat = "0.0%";
+arcSheet.getRange("P2:P150").format.numberFormat = "0.00";
 
 writeTable(
   arcEnsembleSheet,
@@ -642,7 +659,7 @@ writeTable(
 );
 arcScoreEnsembleSheet.getRange("H2:H50").format.numberFormat = "0.0%";
 
-notes.getRange("A1:B20").values = [
+notes.getRange("A1:B21").values = [
   ["Item", "Note"],
   ["Benchmark", "Closed-form multiple-choice probe scored by candidate letter log-probability."],
   ["Current wins", "Qwen3-0.6B-4bit improves from 5/17 to 7/17 with split 14; Qwen3-1.7B-4bit improves from 10/17 to 11/17 with split 10."],
@@ -655,7 +672,8 @@ notes.getRange("A1:B20").values = [
   ["ARC pure refined", "Pure refined-output scoring collapses on ARC validation[:50]: Qwen3-0.6B drops to 14/50 and Qwen3-1.7B drops to 9/50. This conversion needs conservative fusion; the recurrent path is not a standalone no-training HRM replacement."],
   ["ARC margin ensemble", "A base-margin switch to HRM when base top-two margin <= 0.25 improves Qwen3-0.6B validation[:50] from 21/50 to 23/50, but drops validation[50:100] from 17/50 to 16/50 and Qwen3-1.7B from 37/50 to 36/50. Treat as overfit."],
   ["ARC architecture probes", "Qwen3-0.6B agreement_blend with H=2 and with split_index=10 both remained 21/50 on ARC validation[:50]. Deeper recurrence or a smaller L split did not improve the dataset-backed slice."],
-  ["ARC full validation", "On full ARC-Challenge validation, Qwen3-0.6B base and agreement_blend both score 112/299; Qwen3-1.7B base and agreement_blend both score 207/299. The safer gated fusion preserves base but does not improve the full validation split."],
+  ["ARC full validation", "On full ARC-Challenge validation, uncalibrated Qwen3-0.6B base and agreement_blend both score 112/299; uncalibrated Qwen3-1.7B base and agreement_blend both score 207/299. The safer gated fusion preserves base but does not improve the full validation split."],
+  ["ARC calibrated full validation", "No-training calibration is the first robust ARC gain: Qwen3-0.6B option-prior calibration improves base/agreement_blend to 121/299, and Qwen3-1.7B answer-prior calibration improves base/agreement_blend to 211/299."],
   ["ARC scoring surfaces", "Choice-text scoring is much worse than answer-letter scoring on ARC slices. Qwen3-1.7B label+text scoring ties the 37/50 first-slice base score, and a margin switch reaches 38/50 on validation[:50] but only ties base at 33/50 on validation[50:100]. Treat as exploratory, not solid improvement."],
   ["HRM-Text comparison", "The original HRM-Text exact run used the wrong final-answer prompt/extraction and too small a token cap. Corrected boxed-prompt runs score 16/17 for both 4-bit and BF16."],
   ["Cost", "HRM is slower because it adds warm split and recurrent passes per scored candidate/token."],
@@ -668,8 +686,8 @@ notes.getRange("A1:B1").format = {
   fill: { type: "solid", color: "#1F4E78" },
   font: { color: "#FFFFFF", bold: true },
 };
-notes.getRange("A1:B20").format.wrapText = true;
-notes.getRange("A1:B20").format.autofitColumns();
+notes.getRange("A1:B21").format.wrapText = true;
+notes.getRange("A1:B21").format.autofitColumns();
 
 for (const sheet of [
   summary,
@@ -699,7 +717,7 @@ console.log(errors.ndjson);
 await workbook.render({ sheetName: "Summary", range: "A1:I16", scale: 2 });
 await workbook.render({ sheetName: "Exact Runs", range: "A1:N14", scale: 2 });
 await workbook.render({ sheetName: "Rerank Runs", range: "A1:K8", scale: 2 });
-await workbook.render({ sheetName: "ARC Runs", range: "A1:O27", scale: 2 });
+await workbook.render({ sheetName: "ARC Runs", range: "A1:Q40", scale: 2 });
 await workbook.render({ sheetName: "ARC Ensembles", range: "A1:H11", scale: 2 });
 await workbook.render({ sheetName: "ARC Score Ensembles", range: "A1:J5", scale: 2 });
 const output = await SpreadsheetFile.exportXlsx(workbook);
