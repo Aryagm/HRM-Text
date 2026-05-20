@@ -1,0 +1,22 @@
+engine: MLXQwenHRMEngine
+ckpt_path: mlx-community/Qwen3-1.7B-4bit
+mode: hrm
+chat_template: true
+
+generation_config:
+  max_tokens: 128
+  temperature: 0.0
+
+benchmarks:
+  - name: GSM8k
+    split: "test[:20]"
+    generation_config:
+      prompt_template: "{prompt}\nReason briefly. Finish with exactly one boxed number: \\boxed{{number}}"
+
+  - name: ARC
+    split: "validation[:50]"
+    subset: ARC-Challenge
+    num_shots: 0
+    generation_config:
+      max_tokens: 1
+      prompt_template: "{prompt}"

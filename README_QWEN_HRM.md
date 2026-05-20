@@ -156,6 +156,19 @@ numbers are useful as a local comparison, but they are prompt-sensitive because
 the native HRM-Text model appears to use different formatting and task
 conventions than Qwen chat checkpoints.
 
+For broader evaluation, the repo's standard benchmark runner now has an MLX
+Qwen-HRM engine. Use it for small Apple Silicon slices before spending time on
+full benchmark passes:
+
+```bash
+python -m evaluation.main \
+  config=evaluation/config/mlx_qwen_hrm_benchmarking.yaml
+```
+
+The included config starts with limited GSM8K and ARC-Challenge slices. Those are
+better direction tests than the 17-item probe because they are dataset-backed and
+less exposed to hand-written option priors.
+
 Additional stability knobs:
 
 - `--update-mix-l` and `--update-mix-h` under-relax recurrent state updates.

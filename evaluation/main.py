@@ -59,9 +59,15 @@ def main():
         if cfg.run_only is not None and b_name not in cfg.run_only:
             continue
 
-        # Instantiate benchmark
+        # Instantiate benchmark. "limit" is an eval-run control, not a benchmark
+        # constructor argument.
         bench_cls = load_model_class(f"benchmarks@{b_name}", prefix="evaluation.")
-        benchmark = bench_cls(**(b_cfg.__pydantic_extra__ or {}))
+        bench_kwargs = dict(b_cfg.__pydantic_extra__ or {})
+        limit = bench_kwargs.pop("limit", None)
+        benchmark = bench_cls(**bench_kwargs)
+        if limit is not None:
+            benchmark.prompts = benchmark.prompts[:limit]
+            benchmark.ground_truths = benchmark.ground_truths[:limit]
 
         # Resolve final generation config: Base -> Benchmark Specific -> Benchmark Overrides
         gen_cfg = cfg.generation_config | benchmark.generation_overrides | b_cfg.generation_config
