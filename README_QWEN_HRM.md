@@ -239,15 +239,18 @@ Targeted 0.6B ARC architecture checks also stayed flat:
 So neither deeper recurrence nor moving the L/H split earlier improved the
 dataset-backed 0.6B ARC slice.
 
-Full ARC-Challenge validation for Qwen3-0.6B:
+Full ARC-Challenge validation:
 
 | Run | Correct |
 | --- | ---: |
 | Qwen3-0.6B Base, validation full | 112 / 299 |
 | Qwen3-0.6B agreement gate, validation full | 112 / 299 |
+| Qwen3-1.7B Base, validation full | 207 / 299 |
+| Qwen3-1.7B agreement gate, validation full | 207 / 299 |
 
 This confirms that agreement-gated fusion preserves base behavior on the full
-validation split, but does not create a measurable ARC improvement.
+validation split for both tested Qwen sizes, but does not create a measurable
+ARC improvement.
 
 For broader evaluation, the repo's standard benchmark runner now has an MLX
 Qwen-HRM engine. Use it for small Apple Silicon slices before spending time on
