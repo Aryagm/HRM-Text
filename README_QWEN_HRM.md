@@ -278,14 +278,17 @@ ARC-Easy transfer check:
 | Qwen3-0.6B Base, validation full | 348 / 570 |
 | Qwen3-0.6B Base, option-prior calibrated, validation full | 355 / 570 |
 | Qwen3-0.6B agreement gate, option-prior calibrated, validation full | 355 / 570 |
+| Qwen3-1.7B Base, validation full | 489 / 570 |
+| Qwen3-1.7B Base, answer-prior calibrated weight 1.0, validation full | 488 / 570 |
 | Qwen3-1.7B Base, validation[:200] | 173 / 200 |
 | Qwen3-1.7B Base, answer-prior calibrated weight 1.0, validation[:200] | 173 / 200 |
 | Qwen3-1.7B Base, answer-prior calibrated weight 1.7, validation[:200] | 172 / 200 |
 | Qwen3-1.7B agreement gate, answer-prior calibrated weight 1.0, validation[:200] | 173 / 200 |
 
 So the 0.6B option-prior gain transfers modestly to full ARC-Easy validation,
-while the 1.7B weight `1.7` setting looks ARC-Challenge-specific and should not
-be treated as a general default yet.
+while 1.7B answer-prior calibration does not transfer to full ARC-Easy. The
+1.7B weight `1.7` setting looks ARC-Challenge-specific and should not be treated
+as a general default yet.
 
 ARC scoring-surface follow-up:
 
