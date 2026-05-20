@@ -256,6 +256,8 @@ Full ARC-Challenge validation:
 | Qwen3-1.7B agreement gate, validation full | 207 / 299 |
 | Qwen3-1.7B Base, answer-prior calibrated, validation full | 211 / 299 |
 | Qwen3-1.7B agreement gate, answer-prior calibrated, validation full | 211 / 299 |
+| Qwen3-1.7B Base, answer-prior calibrated weight 1.7, validation full | 216 / 299 |
+| Qwen3-1.7B agreement gate, answer-prior calibrated weight 1.7, validation full | 216 / 299 |
 
 This confirms that agreement-gated fusion preserves base behavior on the full
 validation split for both tested Qwen sizes, but does not create a measurable
@@ -264,6 +266,10 @@ No-training calibration does create a measurable ARC improvement: the smaller
 Qwen3-0.6B checkpoint benefits from subtracting an options-only prior, while
 Qwen3-1.7B benefits from subtracting a bare answer-label prior. Agreement-gated
 Qwen-HRM preserves both calibrated gains.
+Post-hoc sweeps over the saved raw/prior scores show Qwen3-1.7B has more
+headroom with a stronger answer-prior subtraction: weight `1.7` reaches
+`216 / 299` on full validation for both base and agreement-gated Qwen-HRM. Treat
+that weight as tuned on ARC validation until it is tested on another benchmark.
 
 ARC scoring-surface follow-up:
 

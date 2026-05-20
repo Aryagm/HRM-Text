@@ -257,6 +257,20 @@ const arcScoreEnsembleRows = [
   ...(await readRows("arc_qwen3_1_7b_base_score_ensemble_validation50.csv").catch(() => [])),
   ...(await readRows("arc_qwen3_1_7b_hrm_agreement_score_ensemble_validation50.csv").catch(() => [])),
 ];
+const arcCalibrationSweepRows = [
+  ...(await readRows("arc_qwen3_0_6b_base_calibration_weight_sweep_validation50.csv").catch(() => [])),
+  ...(await readRows("arc_qwen3_0_6b_hrm_agreement_calibration_weight_sweep_validation50.csv").catch(() => [])),
+  ...(await readRows("arc_qwen3_0_6b_base_calibration_weight_sweep_validation50_100.csv").catch(() => [])),
+  ...(await readRows("arc_qwen3_0_6b_hrm_agreement_calibration_weight_sweep_validation50_100.csv").catch(() => [])),
+  ...(await readRows("arc_qwen3_0_6b_base_calibration_weight_sweep_validation299.csv").catch(() => [])),
+  ...(await readRows("arc_qwen3_0_6b_hrm_agreement_calibration_weight_sweep_validation299.csv").catch(() => [])),
+  ...(await readRows("arc_qwen3_1_7b_base_calibration_weight_sweep_validation50.csv").catch(() => [])),
+  ...(await readRows("arc_qwen3_1_7b_hrm_agreement_calibration_weight_sweep_validation50.csv").catch(() => [])),
+  ...(await readRows("arc_qwen3_1_7b_base_calibration_weight_sweep_validation50_100.csv").catch(() => [])),
+  ...(await readRows("arc_qwen3_1_7b_hrm_agreement_calibration_weight_sweep_validation50_100.csv").catch(() => [])),
+  ...(await readRows("arc_qwen3_1_7b_base_calibration_weight_sweep_validation299.csv").catch(() => [])),
+  ...(await readRows("arc_qwen3_1_7b_hrm_agreement_calibration_weight_sweep_validation299.csv").catch(() => [])),
+];
 const finalRows = [...final06, ...final17];
 const finalRuns = uniqueRuns(finalRows);
 const sweepRuns = uniqueRuns([
@@ -274,6 +288,13 @@ const rerankRuns = rerankRunSummary(rerankRows);
 const arcRuns = simpleRunSummary(arcRows, ["source_file", "model", "mode", "logit_fusion"]);
 const arcEnsembleRuns = simpleRunSummary(arcEnsembleRows, ["source_file", "model", "threshold"]);
 const arcScoreEnsembleRuns = simpleRunSummary(arcScoreEnsembleRows, ["source_file", "model", "normalize", "weights"]);
+const arcCalibrationSweepRuns = simpleRunSummary(arcCalibrationSweepRows, [
+  "source_file",
+  "model",
+  "mode",
+  "calibration",
+  "sweep_weight",
+]);
 
 const workbook = Workbook.create();
 const summary = workbook.worksheets.add("Summary");
@@ -286,6 +307,7 @@ const rerankSheet = workbook.worksheets.add("Rerank Runs");
 const arcSheet = workbook.worksheets.add("ARC Runs");
 const arcEnsembleSheet = workbook.worksheets.add("ARC Ensembles");
 const arcScoreEnsembleSheet = workbook.worksheets.add("ARC Score Ensembles");
+const arcCalibrationSweepSheet = workbook.worksheets.add("ARC Calib Sweeps");
 const notes = workbook.worksheets.add("Notes");
 
 summary.getRange("A1").values = [["Qwen HRM Conversion Metrics"]];
@@ -659,7 +681,39 @@ writeTable(
 );
 arcScoreEnsembleSheet.getRange("H2:H50").format.numberFormat = "0.0%";
 
-notes.getRange("A1:B21").values = [
+writeTable(
+  arcCalibrationSweepSheet,
+  "A1",
+  [
+    "Model",
+    "Split",
+    "Limit",
+    "Mode",
+    "Calibration",
+    "Source Weight",
+    "Sweep Weight",
+    "Correct",
+    "Total",
+    "Accuracy",
+    "Source",
+  ],
+  arcCalibrationSweepRuns.map((r) => [
+    modelLabel(r.model),
+    r.split,
+    asNumber(r.limit),
+    r.mode,
+    r.calibration,
+    asNumber(r.source_weight),
+    asNumber(r.sweep_weight),
+    asNumber(r.correct),
+    asNumber(r.total),
+    asNumber(r.accuracy),
+    r.source_file,
+  ]),
+);
+arcCalibrationSweepSheet.getRange("J2:J250").format.numberFormat = "0.0%";
+
+notes.getRange("A1:B22").values = [
   ["Item", "Note"],
   ["Benchmark", "Closed-form multiple-choice probe scored by candidate letter log-probability."],
   ["Current wins", "Qwen3-0.6B-4bit improves from 5/17 to 7/17 with split 14; Qwen3-1.7B-4bit improves from 10/17 to 11/17 with split 10."],
@@ -674,6 +728,7 @@ notes.getRange("A1:B21").values = [
   ["ARC architecture probes", "Qwen3-0.6B agreement_blend with H=2 and with split_index=10 both remained 21/50 on ARC validation[:50]. Deeper recurrence or a smaller L split did not improve the dataset-backed slice."],
   ["ARC full validation", "On full ARC-Challenge validation, uncalibrated Qwen3-0.6B base and agreement_blend both score 112/299; uncalibrated Qwen3-1.7B base and agreement_blend both score 207/299. The safer gated fusion preserves base but does not improve the full validation split."],
   ["ARC calibrated full validation", "No-training calibration is the first robust ARC gain: Qwen3-0.6B option-prior calibration improves base/agreement_blend to 121/299, and Qwen3-1.7B answer-prior calibration improves base/agreement_blend to 211/299."],
+  ["ARC calibration sweep", "Post-hoc calibration-weight sweeps from saved raw/prior scores show Qwen3-0.6B is best at weight 1.0 on full validation, while Qwen3-1.7B answer-prior weight 1.7 reaches 216/299 for both base and agreement_blend. Treat 1.7 as tuned on validation until tested elsewhere."],
   ["ARC scoring surfaces", "Choice-text scoring is much worse than answer-letter scoring on ARC slices. Qwen3-1.7B label+text scoring ties the 37/50 first-slice base score, and a margin switch reaches 38/50 on validation[:50] but only ties base at 33/50 on validation[50:100]. Treat as exploratory, not solid improvement."],
   ["HRM-Text comparison", "The original HRM-Text exact run used the wrong final-answer prompt/extraction and too small a token cap. Corrected boxed-prompt runs score 16/17 for both 4-bit and BF16."],
   ["Cost", "HRM is slower because it adds warm split and recurrent passes per scored candidate/token."],
@@ -686,8 +741,8 @@ notes.getRange("A1:B1").format = {
   fill: { type: "solid", color: "#1F4E78" },
   font: { color: "#FFFFFF", bold: true },
 };
-notes.getRange("A1:B21").format.wrapText = true;
-notes.getRange("A1:B21").format.autofitColumns();
+notes.getRange("A1:B22").format.wrapText = true;
+notes.getRange("A1:B22").format.autofitColumns();
 
 for (const sheet of [
   summary,
@@ -700,6 +755,7 @@ for (const sheet of [
   arcSheet,
   arcEnsembleSheet,
   arcScoreEnsembleSheet,
+  arcCalibrationSweepSheet,
   notes,
 ]) {
   sheet.getRange("A1:Q300").format.verticalAlignment = "top";
@@ -720,6 +776,7 @@ await workbook.render({ sheetName: "Rerank Runs", range: "A1:K8", scale: 2 });
 await workbook.render({ sheetName: "ARC Runs", range: "A1:Q40", scale: 2 });
 await workbook.render({ sheetName: "ARC Ensembles", range: "A1:H11", scale: 2 });
 await workbook.render({ sheetName: "ARC Score Ensembles", range: "A1:J5", scale: 2 });
+await workbook.render({ sheetName: "ARC Calib Sweeps", range: "A1:K253", scale: 2 });
 const output = await SpreadsheetFile.exportXlsx(workbook);
 await output.save(OUT_FILE);
 console.log(OUT_FILE);
