@@ -174,6 +174,20 @@ this probe, so open-ended generation should use a base-anchored gate rather than
 blindly blend refined logits on every generated token. The next strategy should
 try verifier/reranker use of the refined path if we want gains above base.
 
+Candidate reranking was also tested over saved Qwen3-1.7B exact outputs. The
+combined raw/chat candidate pool has an oracle union of 11 / 17 correct cases,
+but naive no-training rerankers did not exploit it:
+
+| Reranker | Correct |
+| --- | ---: |
+| Raw base + HRM candidates, base yes/no verifier | 6 / 17 |
+| Raw base + HRM candidates, HRM agreement yes/no verifier | 6 / 17 |
+| Raw base + HRM candidates, base answer-likelihood ranker | 6 / 17 |
+| Raw + chat/gated candidates, base answer-likelihood ranker | 6 / 17 |
+
+So the candidate-generation side has useful diversity, but the verifier needs to
+be substantially better than single-pass yes/no or answer-likelihood logits.
+
 For broader evaluation, the repo's standard benchmark runner now has an MLX
 Qwen-HRM engine. Use it for small Apple Silicon slices before spending time on
 full benchmark passes:
