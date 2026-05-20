@@ -282,6 +282,9 @@ const arcCalibrationSweepRows = [
   ...(await readRows("arc_qwen3_1_7b_hrm_agreement_calibration_weight_sweep_validation50_100.csv").catch(() => [])),
   ...(await readRows("arc_qwen3_1_7b_base_calibration_weight_sweep_validation299.csv").catch(() => [])),
   ...(await readRows("arc_qwen3_1_7b_hrm_agreement_calibration_weight_sweep_validation299.csv").catch(() => [])),
+  ...(await readRows("arc_easy_qwen3_0_6b_base_calibration_weight_sweep_validation570.csv").catch(() => [])),
+  ...(await readRows("arc_easy_qwen3_0_6b_hrm_agreement_calibration_weight_sweep_validation570.csv").catch(() => [])),
+  ...(await readRows("arc_easy_qwen3_1_7b_base_calibration_weight_sweep_validation570.csv").catch(() => [])),
 ];
 const finalRows = [...final06, ...final17];
 const finalRuns = uniqueRuns(finalRows);
@@ -725,7 +728,7 @@ writeTable(
     r.source_file,
   ]),
 );
-arcCalibrationSweepSheet.getRange("J2:J250").format.numberFormat = "0.0%";
+arcCalibrationSweepSheet.getRange("J2:J320").format.numberFormat = "0.0%";
 
 notes.getRange("A1:B23").values = [
   ["Item", "Note"],
@@ -743,7 +746,7 @@ notes.getRange("A1:B23").values = [
   ["ARC full validation", "On full ARC-Challenge validation, uncalibrated Qwen3-0.6B base and agreement_blend both score 112/299; uncalibrated Qwen3-1.7B base and agreement_blend both score 207/299. The safer gated fusion preserves base but does not improve the full validation split."],
   ["ARC calibrated full validation", "No-training calibration is the first robust ARC gain: Qwen3-0.6B option-prior calibration improves base/agreement_blend to 121/299, and Qwen3-1.7B answer-prior calibration improves base/agreement_blend to 211/299."],
   ["ARC calibration sweep", "Post-hoc calibration-weight sweeps from saved raw/prior scores show Qwen3-0.6B is best at weight 1.0 on full validation, while Qwen3-1.7B answer-prior weight 1.7 reaches 216/299 for both base and agreement_blend. Treat 1.7 as tuned on validation until tested elsewhere."],
-  ["ARC-Easy transfer", "On full ARC-Easy validation, Qwen3-0.6B option-prior calibration transfers from 348/570 to 355/570 and agreement_blend preserves 355/570. Qwen3-1.7B answer-prior calibration does not transfer: full ARC-Easy moves from 489/570 to 488/570 at weight 1.0."],
+  ["ARC-Easy transfer", "On full ARC-Easy validation, Qwen3-0.6B option-prior calibration transfers from 348/570 to 355/570 at weight 1.0; a post-hoc weight sweep reaches 365/570 at weight 0.8 for both base and agreement_blend. Qwen3-1.7B answer-prior calibration is not robust: weight 1.0 is 488/570 and the best swept weight 0.4 reaches only 490/570."],
   ["ARC scoring surfaces", "Choice-text scoring is much worse than answer-letter scoring on ARC slices. Qwen3-1.7B label+text scoring ties the 37/50 first-slice base score, and a margin switch reaches 38/50 on validation[:50] but only ties base at 33/50 on validation[50:100]. Treat as exploratory, not solid improvement."],
   ["HRM-Text comparison", "The original HRM-Text exact run used the wrong final-answer prompt/extraction and too small a token cap. Corrected boxed-prompt runs score 16/17 for both 4-bit and BF16."],
   ["Cost", "HRM is slower because it adds warm split and recurrent passes per scored candidate/token."],
@@ -791,7 +794,7 @@ await workbook.render({ sheetName: "Rerank Runs", range: "A1:K8", scale: 2 });
 await workbook.render({ sheetName: "ARC Runs", range: "A1:R52", scale: 2 });
 await workbook.render({ sheetName: "ARC Ensembles", range: "A1:H11", scale: 2 });
 await workbook.render({ sheetName: "ARC Score Ensembles", range: "A1:J5", scale: 2 });
-await workbook.render({ sheetName: "ARC Calib Sweeps", range: "A1:K253", scale: 2 });
+await workbook.render({ sheetName: "ARC Calib Sweeps", range: "A1:K316", scale: 2 });
 const output = await SpreadsheetFile.exportXlsx(workbook);
 await output.save(OUT_FILE);
 console.log(OUT_FILE);
