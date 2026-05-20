@@ -179,7 +179,13 @@ def hrm_prompt(prompt: str) -> str:
     return f"<|im_start|><|quad_end|><|object_ref_end|>{inner}<|im_end|>"
 
 
-def configure_qwen(model: QwenHrmForCausalLM, mode: str, logit_blend: float | None = None) -> None:
+def configure_qwen(
+    model: QwenHrmForCausalLM,
+    mode: str,
+    logit_blend: float | None = None,
+    logit_fusion: str | None = None,
+    fusion_threshold: float | None = None,
+) -> None:
     if mode == "base":
         model.model.H_cycles = 0
         model.model.L_cycles = 1
@@ -196,8 +202,8 @@ def configure_qwen(model: QwenHrmForCausalLM, mode: str, logit_blend: float | No
     model.model.update_mix_h = 1.0
     model.model.refined_delta_scale = 1.0
     model.logit_blend = 0.2 if logit_blend is None else logit_blend
-    model.logit_fusion = "blend"
-    model.fusion_threshold = 0.0
+    model.logit_fusion = "blend" if logit_fusion is None else logit_fusion
+    model.fusion_threshold = 0.0 if fusion_threshold is None else fusion_threshold
 
 
 def run_qwen(
@@ -208,6 +214,8 @@ def run_qwen(
     chat_template: bool,
     enable_thinking: bool,
     logit_blend: float | None,
+    logit_fusion: str | None,
+    fusion_threshold: float | None,
 ) -> list[dict[str, str | int | float | bool]]:
     import mlx.core as mx
     from transformers import AutoTokenizer
@@ -217,7 +225,7 @@ def run_qwen(
 
     tokenizer = AutoTokenizer.from_pretrained(model_id, use_fast=True, trust_remote_code=True)
     model = QwenHrmForCausalLM.from_pretrained(model_id)
-    configure_qwen(model, mode, logit_blend=logit_blend)
+    configure_qwen(model, mode, logit_blend=logit_blend, logit_fusion=logit_fusion, fusion_threshold=fusion_threshold)
     mx.eval(model.parameters())
 
     rows = []
@@ -251,6 +259,8 @@ def run_qwen(
                 "enable_thinking": enable_thinking,
                 "max_tokens": max_tokens,
                 "logit_blend": model.logit_blend,
+                "logit_fusion": model.logit_fusion,
+                "fusion_threshold": model.fusion_threshold,
                 "output": output,
             }
         )
@@ -293,6 +303,8 @@ def run_hrm_text(model_dir: str, max_tokens: int, dtype: str) -> list[dict[str, 
                 "enable_thinking": False,
                 "max_tokens": max_tokens,
                 "logit_blend": "",
+                "logit_fusion": "",
+                "fusion_threshold": "",
                 "output": output,
             }
         )
@@ -320,6 +332,8 @@ def write_results(out: Path, model: str, mode: str, rows: list[dict[str, str | i
         "enable_thinking",
         "max_tokens",
         "logit_blend",
+        "logit_fusion",
+        "fusion_threshold",
         "output",
     ]
     with out.open("w", newline="") as handle:
@@ -354,6 +368,12 @@ def main() -> None:
     parser.add_argument("--qwen-chat-template", action="store_true")
     parser.add_argument("--qwen-enable-thinking", action="store_true")
     parser.add_argument("--qwen-logit-blend", type=float, default=None)
+    parser.add_argument(
+        "--qwen-logit-fusion",
+        choices=("blend", "delta", "prob_blend", "confidence_gate", "agreement_blend"),
+        default=None,
+    )
+    parser.add_argument("--qwen-fusion-threshold", type=float, default=None)
     args = parser.parse_args()
 
     if args.engine == "qwen":
@@ -365,6 +385,8 @@ def main() -> None:
             args.qwen_chat_template,
             args.qwen_enable_thinking,
             args.qwen_logit_blend,
+            args.qwen_logit_fusion,
+            args.qwen_fusion_threshold,
         )
         write_results(args.out, args.model, args.mode, rows)
     else:

@@ -164,12 +164,15 @@ the generative exact score:
 | Qwen3-1.7B Qwen-HRM, chat + boxed, blend 0.20 | 5 / 17 |
 | Qwen3-1.7B Qwen-HRM, chat + boxed, blend 0.10 | 5 / 17 |
 | Qwen3-1.7B Qwen-HRM, chat + boxed, blend 0.05 | 5 / 17 |
+| Qwen3-1.7B Qwen-HRM, chat + boxed, agreement gate | 6 / 17 |
+| Qwen3-1.7B Qwen-HRM, chat + boxed, confidence gate | 6 / 17 |
 
 That points to a real limitation in the current no-training fusion: fixed logit
 blending can improve candidate log-probability ranking while still damaging
-open-ended chat generation. The next inference strategy should gate or rerank
-with a verifier rather than blindly blend refined logits on every generated
-token.
+open-ended chat generation. Agreement/confidence gates recover the base score on
+this probe, so open-ended generation should use a base-anchored gate rather than
+blindly blend refined logits on every generated token. The next strategy should
+try verifier/reranker use of the refined path if we want gains above base.
 
 For broader evaluation, the repo's standard benchmark runner now has an MLX
 Qwen-HRM engine. Use it for small Apple Silicon slices before spending time on
@@ -195,5 +198,7 @@ Additional stability knobs:
 - `--logit-fusion` can test alternate output fusion. Current tracked options are
   `blend`, `delta`, `prob_blend`, `confidence_gate`, and `agreement_blend`.
   Confidence-gated, agreement-gated, probability-space, and extrapolated-delta
-  fusion did not beat fixed logit blending on the corrected probe, so `blend`
-  remains the default.
+  fusion did not beat fixed logit blending on the corrected MC probe, so `blend`
+  remains the scoring default. For open-ended generation, prefer
+  `agreement_blend` or `confidence_gate` to avoid the fixed-blend degradation
+  observed in chat-template exact-answer runs.

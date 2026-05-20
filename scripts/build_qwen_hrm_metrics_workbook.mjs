@@ -157,6 +157,8 @@ const exactRows = [
   ...(await readRows("exact_qwen3_1_7b_hrm_chat_boxed.csv").catch(() => [])),
   ...(await readRows("exact_qwen3_1_7b_hrm_chat_boxed_blend01.csv").catch(() => [])),
   ...(await readRows("exact_qwen3_1_7b_hrm_chat_boxed_blend005.csv").catch(() => [])),
+  ...(await readRows("exact_qwen3_1_7b_hrm_chat_boxed_agreement.csv").catch(() => [])),
+  ...(await readRows("exact_qwen3_1_7b_hrm_chat_boxed_confidence.csv").catch(() => [])),
   ...(await readRows("exact_hrm_text_1b_4bit_corrected.csv").catch(() => [])),
   ...(await readRows("exact_hrm_text_1b_bf16_corrected.csv").catch(() => [])),
 ];
@@ -373,6 +375,8 @@ writeTable(
     "Chat Template",
     "Thinking",
     "Blend",
+    "Fusion",
+    "Threshold",
     "Correct Cases",
     "Source",
   ],
@@ -388,6 +392,8 @@ writeTable(
     r.chat_template || "",
     r.enable_thinking || "",
     r.logit_blend || "",
+    r.logit_fusion || "",
+    r.fusion_threshold || "",
     r.correct_cases,
     r.source_file,
   ]),
@@ -398,7 +404,22 @@ exactSheet.getRange("F2:G50").format.numberFormat = "0.00";
 writeTable(
   exactCasesSheet,
   "A1",
-  ["Model", "Mode", "Case", "Expected", "Extracted", "Correct", "Elapsed s", "Prompt Style", "Chat Template", "Thinking", "Blend", "Source"],
+  [
+    "Model",
+    "Mode",
+    "Case",
+    "Expected",
+    "Extracted",
+    "Correct",
+    "Elapsed s",
+    "Prompt Style",
+    "Chat Template",
+    "Thinking",
+    "Blend",
+    "Fusion",
+    "Threshold",
+    "Source",
+  ],
   exactRows.map((r) => [
     modelLabel(r.model),
     exactModeLabel(r),
@@ -411,17 +432,20 @@ writeTable(
     r.chat_template || "",
     r.enable_thinking || "",
     r.logit_blend || "",
+    r.logit_fusion || "",
+    r.fusion_threshold || "",
     r.source_file,
   ]),
 );
 exactCasesSheet.getRange("G2:G300").format.numberFormat = "0.00";
 
-notes.getRange("A1:B11").values = [
+notes.getRange("A1:B12").values = [
   ["Item", "Note"],
   ["Benchmark", "Closed-form multiple-choice probe scored by candidate letter log-probability."],
   ["Current wins", "Qwen3-0.6B-4bit improves from 5/17 to 7/17 with split 14; Qwen3-1.7B-4bit improves from 10/17 to 11/17 with split 10."],
   ["Split finding", "The symmetric 14/14 split is best for 0.6B; an earlier split at 10 lower layers is best for 1.7B on the corrected probe."],
   ["Exact-answer probe", "Added a stricter generative probe with exact extraction. Qwen3-0.6B moves from 1/17 base to 2/17 HRM; Qwen3-1.7B is 6/17 for both base and HRM after corrected text-answer scoring."],
+  ["Qwen chat exact", "On Qwen3-1.7B chat-template boxed runs, fixed blend scores 5/17 while agreement_blend and confidence_gate recover the 6/17 base score. Use gated fusion for open-ended generation."],
   ["HRM-Text comparison", "The original HRM-Text exact run used the wrong final-answer prompt/extraction and too small a token cap. Corrected boxed-prompt runs score 16/17 for both 4-bit and BF16."],
   ["Cost", "HRM is slower because it adds warm split and recurrent passes per scored candidate/token."],
   ["Correction", "Earlier sequence answer was corrected from 80 to 67 before final runs."],
@@ -433,8 +457,8 @@ notes.getRange("A1:B1").format = {
   fill: { type: "solid", color: "#1F4E78" },
   font: { color: "#FFFFFF", bold: true },
 };
-notes.getRange("A1:B11").format.wrapText = true;
-notes.getRange("A1:B11").format.autofitColumns();
+notes.getRange("A1:B12").format.wrapText = true;
+notes.getRange("A1:B12").format.autofitColumns();
 
 for (const sheet of [summary, finalSheet, casesSheet, sweepSheet, exactSheet, exactCasesSheet, notes]) {
   sheet.getRange("A1:Q300").format.verticalAlignment = "top";
@@ -450,7 +474,7 @@ const errors = await workbook.inspect({
 });
 console.log(errors.ndjson);
 await workbook.render({ sheetName: "Summary", range: "A1:I16", scale: 2 });
-await workbook.render({ sheetName: "Exact Runs", range: "A1:I9", scale: 2 });
+await workbook.render({ sheetName: "Exact Runs", range: "A1:L12", scale: 2 });
 const output = await SpreadsheetFile.exportXlsx(workbook);
 await output.save(OUT_FILE);
 console.log(OUT_FILE);
