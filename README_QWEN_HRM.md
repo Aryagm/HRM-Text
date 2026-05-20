@@ -196,13 +196,17 @@ ARC-Challenge validation slice:
 
 | Run | Correct |
 | --- | ---: |
+| Qwen3-0.6B Base, validation[:50] | 21 / 50 |
+| Qwen3-0.6B Qwen-HRM, fixed blend | 21 / 50 |
+| Qwen3-0.6B Qwen-HRM, agreement gate | 21 / 50 |
 | Qwen3-1.7B Base, validation[:50] | 37 / 50 |
 | Qwen3-1.7B Qwen-HRM, fixed blend | 35 / 50 |
 | Qwen3-1.7B Qwen-HRM, agreement gate | 37 / 50 |
 
-This dataset-backed slice agrees with the chat-generation finding: fixed blend
-is risky outside the tiny hand-written MC probe, while agreement-gated fusion is
-the safer no-training default.
+This dataset-backed slice weakens the earlier custom-MC story: the 0.6B gain did
+not transfer to ARC, and fixed blend is risky outside the tiny hand-written MC
+probe. Agreement-gated fusion is the safer no-training default, but it is
+currently a preservation strategy rather than a reliable improvement strategy.
 
 For broader evaluation, the repo's standard benchmark runner now has an MLX
 Qwen-HRM engine. Use it for small Apple Silicon slices before spending time on

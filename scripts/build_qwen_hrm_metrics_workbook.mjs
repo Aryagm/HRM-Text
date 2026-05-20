@@ -200,6 +200,9 @@ const rerankRows = [
   ...(await readRows("rerank_qwen3_1_7b_mixed_base_answer_likelihood.csv").catch(() => [])),
 ];
 const arcRows = [
+  ...(await readRows("arc_qwen3_0_6b_base_validation50.csv").catch(() => [])),
+  ...(await readRows("arc_qwen3_0_6b_hrm_validation50.csv").catch(() => [])),
+  ...(await readRows("arc_qwen3_0_6b_hrm_agreement_validation50.csv").catch(() => [])),
   ...(await readRows("arc_qwen3_1_7b_base_validation50.csv").catch(() => [])),
   ...(await readRows("arc_qwen3_1_7b_hrm_validation50.csv").catch(() => [])),
   ...(await readRows("arc_qwen3_1_7b_hrm_agreement_validation50.csv").catch(() => [])),
@@ -551,7 +554,7 @@ notes.getRange("A1:B15").values = [
   ["Qwen chat exact", "On Qwen3-1.7B chat-template boxed runs, fixed blend scores 5/17 while agreement_blend and confidence_gate recover the 6/17 base score. Use gated fusion for open-ended generation."],
   ["Delayed fusion", "Final-answer-triggered HRM fusion also recovers the 6/17 base score on Qwen3-1.7B chat-template boxed runs. It is safer than full-sequence fixed blending but still not above base."],
   ["Candidate rerank", "Saved-output candidate reranking found an 11/17 oracle union across raw/chat candidates, but naive yes/no and answer-likelihood rerankers selected only 6/17. Need a stronger verifier."],
-  ["ARC-Challenge slice", "On ARC-Challenge validation[:50], Qwen3-1.7B base scores 37/50, fixed HRM blend scores 35/50, and agreement_blend recovers 37/50."],
+  ["ARC-Challenge slice", "On ARC-Challenge validation[:50], Qwen3-0.6B is flat at 21/50 for base, fixed blend, and agreement_blend; Qwen3-1.7B base is 37/50, fixed blend is 35/50, and agreement_blend recovers 37/50."],
   ["HRM-Text comparison", "The original HRM-Text exact run used the wrong final-answer prompt/extraction and too small a token cap. Corrected boxed-prompt runs score 16/17 for both 4-bit and BF16."],
   ["Cost", "HRM is slower because it adds warm split and recurrent passes per scored candidate/token."],
   ["Correction", "Earlier sequence answer was corrected from 80 to 67 before final runs."],
