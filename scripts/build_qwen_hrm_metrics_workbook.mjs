@@ -153,8 +153,8 @@ const exactRows = [
   ...(await readRows("exact_qwen3_0_6b_hrm.csv").catch(() => [])),
   ...(await readRows("exact_qwen3_1_7b_base.csv").catch(() => [])),
   ...(await readRows("exact_qwen3_1_7b_hrm.csv").catch(() => [])),
-  ...(await readRows("exact_hrm_text_1b_4bit.csv").catch(() => [])),
-  ...(await readRows("exact_hrm_text_1b_bf16.csv").catch(() => [])),
+  ...(await readRows("exact_hrm_text_1b_4bit_corrected.csv").catch(() => [])),
+  ...(await readRows("exact_hrm_text_1b_bf16_corrected.csv").catch(() => [])),
 ];
 const finalRows = [...final06, ...final17];
 const finalRuns = uniqueRuns(finalRows);
@@ -387,8 +387,8 @@ notes.getRange("A1:B11").values = [
   ["Benchmark", "Closed-form multiple-choice probe scored by candidate letter log-probability."],
   ["Current wins", "Qwen3-0.6B-4bit improves from 5/17 to 7/17 with split 14; Qwen3-1.7B-4bit improves from 10/17 to 11/17 with split 10."],
   ["Split finding", "The symmetric 14/14 split is best for 0.6B; an earlier split at 10 lower layers is best for 1.7B on the corrected probe."],
-  ["Exact-answer probe", "Added a stricter generative probe with exact extraction. Qwen3-0.6B moves from 1/17 base to 2/17 HRM; Qwen3-1.7B moves from 4/17 base to 5/17 HRM."],
-  ["HRM-Text comparison", "Local HRM-Text-1B scored 3/17 for 4-bit and 1/17 for BF16 on this exact prompt set; treat this as prompt-sensitive, not a definitive model ranking."],
+  ["Exact-answer probe", "Added a stricter generative probe with exact extraction. Qwen3-0.6B moves from 1/17 base to 2/17 HRM; Qwen3-1.7B is 6/17 for both base and HRM after corrected text-answer scoring."],
+  ["HRM-Text comparison", "The original HRM-Text exact run used the wrong final-answer prompt/extraction and too small a token cap. Corrected boxed-prompt runs score 16/17 for both 4-bit and BF16."],
   ["Cost", "HRM is slower because it adds warm split and recurrent passes per scored candidate/token."],
   ["Correction", "Earlier sequence answer was corrected from 80 to 67 before final runs."],
   ["Interpretation", "The MC probe is a fast regression test, not an optimal reasoning benchmark. The exact probe is better but still too small for broad HRM-level claims."],

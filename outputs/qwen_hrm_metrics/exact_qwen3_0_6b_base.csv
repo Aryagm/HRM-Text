@@ -14,7 +14,7 @@ Now, the equation becomes:
 Next, we can move all terms to one side to solve for x. Subtract 5x from both sides:
 
 9x - 2"
-2026-05-20T19:53:21.108076+00:00,mlx-community/Qwen3-0.6B-4bit,base,1,17,0.058823529411764705,markup,96|$96,"Hmm, let's break it down step by step. Let me think. When something is marked up by 25%, that means the original price is reduced by 25% of the original price. Wait, no, actually, when you mark up something, you're increasing its",False,0.39678941699821735," in \boxed{}.
+2026-05-20T19:53:21.108076+00:00,mlx-community/Qwen3-0.6B-4bit,base,1,17,0.058823529411764705,markup,96|$96,,False,0.39678941699821735," in \boxed{}.
 
 Okay, let's try to figure out the original price of the jacket. So, the problem says that first it's marked up by 25%, then discounted by 20%. After all these changes, the final price is $96. We need to find out what the original price was before these changes.
 

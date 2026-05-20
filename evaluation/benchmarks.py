@@ -3,11 +3,43 @@ import re
 from collections import defaultdict, Counter
 from dataclasses import dataclass
 
-from datasets import load_dataset, get_dataset_config_names
-from math_verify import parse, verify
-from lm_eval.tasks.drop.utils import process_results as drop_process_results, process_docs as drop_process_docs
-
 from utils.functions import last_boxed_only_string, compute_benchmark_micro_macro_avg
+
+
+def load_dataset(*args, **kwargs):
+    from datasets import load_dataset as _load_dataset
+
+    return _load_dataset(*args, **kwargs)
+
+
+def get_dataset_config_names(*args, **kwargs):
+    from datasets import get_dataset_config_names as _get_dataset_config_names
+
+    return _get_dataset_config_names(*args, **kwargs)
+
+
+def math_parse(*args, **kwargs):
+    from math_verify import parse
+
+    return parse(*args, **kwargs)
+
+
+def math_verify(*args, **kwargs):
+    from math_verify import verify
+
+    return verify(*args, **kwargs)
+
+
+def drop_process_docs(*args, **kwargs):
+    from lm_eval.tasks.drop.utils import process_docs
+
+    return process_docs(*args, **kwargs)
+
+
+def drop_process_results(*args, **kwargs):
+    from lm_eval.tasks.drop.utils import process_results
+
+    return process_results(*args, **kwargs)
 
 class BaseBenchmark:
     def __init__(self):
@@ -83,7 +115,7 @@ class MATH(BaseBenchmark):
             if ans is None:
                 invalid += 1
                 ans = text
-            if verify(parse(self.ground_truths[i]), parse(ans)):
+            if math_verify(math_parse(self.ground_truths[i]), math_parse(ans)):
                 correct += 1
 
         return {
@@ -360,7 +392,7 @@ class AIMEMajorityVoting(BaseBenchmark):
                 if boxed is not None:
                     text = boxed
 
-                c += verify(str(gt), parse(text))
+                c += math_verify(str(gt), math_parse(text))
                 try:
                     ans = int(text)
                     assert 1 <= ans <= 999

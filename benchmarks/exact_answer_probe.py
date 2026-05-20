@@ -9,14 +9,6 @@ import re
 from pathlib import Path
 import time
 
-import mlx.core as mx
-from transformers import AutoTokenizer
-
-from mlx_hrm_text.generate import generate as generate_hrm_text
-from mlx_hrm_text.model import HrmTextForCausalLM
-from mlx_hrm_text.generate_qwen_hrm import generate as generate_qwen
-from mlx_hrm_text.qwen_hrm import QwenHrmForCausalLM
-
 
 @dataclass(frozen=True)
 class ExactCase:
@@ -51,12 +43,44 @@ FINAL_PATTERNS = [
     re.compile(r"^\s*([^<\n]+?)\s*</answer>", re.IGNORECASE | re.DOTALL),
     re.compile(r"final answer\s*[:：]\s*(.+)", re.IGNORECASE | re.DOTALL),
     re.compile(r"answer\s*[:：]\s*(.+)", re.IGNORECASE | re.DOTALL),
-    re.compile(r"\\boxed\{([^{}]+)\}", re.IGNORECASE),
     re.compile(r"boxed\s*(?:braces)?\s*[:：]?\s*\{([^{}]+)\}", re.IGNORECASE),
 ]
 
 
+def extract_latex_box(text: str) -> str | None:
+    for marker in ("\\boxed", "\\fbox"):
+        idx = text.rfind(marker)
+        if idx < 0:
+            continue
+        left = text.find("{", idx)
+        if left < 0:
+            continue
+        depth = 0
+        for pos in range(left, len(text)):
+            if text[pos] == "{":
+                depth += 1
+            elif text[pos] == "}":
+                depth -= 1
+                if depth == 0:
+                    return text[left + 1 : pos].strip()
+    return None
+
+
+def simplify_latex(text: str) -> str:
+    text = text.strip()
+    frac_pattern = re.compile(r"\\(?:dfrac|tfrac|frac)\s*\{([^{}]+)\}\s*\{([^{}]+)\}")
+    while True:
+        updated = frac_pattern.sub(r"\1/\2", text)
+        if updated == text:
+            break
+        text = updated
+    text = text.replace("\\(", " ").replace("\\)", " ")
+    text = text.replace("\\[", " ").replace("\\]", " ")
+    return text
+
+
 def normalize(text: str) -> str:
+    text = simplify_latex(text)
     text = text.strip().lower()
     text = re.sub(r"^(final\s+)?answer\s*[:：]\s*", "", text)
     text = text.replace("$", "")
@@ -87,6 +111,10 @@ def numeric_equal(a: str, b: str) -> bool:
 
 
 def extract_answer(text: str) -> str:
+    boxed = extract_latex_box(text)
+    if boxed is not None:
+        return boxed
+
     candidates = []
     for pattern in FINAL_PATTERNS:
         matches = pattern.findall(text)
@@ -121,6 +149,9 @@ def is_correct(raw_output: str, expected: tuple[str, ...]) -> tuple[bool, str]:
             exp_num = first_number(exp)
             if exp_num is not None and numeric_equal(number, exp_num):
                 return True, extracted
+    for exp in expected_norms:
+        if first_number(exp) is None and re.search(rf"\b{re.escape(exp)}\b", norm):
+            return True, extracted
     return False, extracted
 
 
@@ -129,7 +160,7 @@ def qwen_prompt(prompt: str) -> str:
 
 
 def hrm_prompt(prompt: str) -> str:
-    inner = f"{prompt} Please reason step by step, and end with exactly one line in this format: Final answer: your answer"
+    inner = f"{prompt} Please reason step by step, and put your final answer within \\boxed{{}}."
     return f"<|im_start|><|quad_end|><|object_ref_end|>{inner}<|im_end|>"
 
 
@@ -155,6 +186,12 @@ def configure_qwen(model: QwenHrmForCausalLM, mode: str) -> None:
 
 
 def run_qwen(model_id: str, mode: str, max_tokens: int) -> list[dict[str, str | int | float | bool]]:
+    import mlx.core as mx
+    from transformers import AutoTokenizer
+
+    from mlx_hrm_text.generate_qwen_hrm import generate as generate_qwen
+    from mlx_hrm_text.qwen_hrm import QwenHrmForCausalLM
+
     tokenizer = AutoTokenizer.from_pretrained(model_id, use_fast=True, trust_remote_code=True)
     model = QwenHrmForCausalLM.from_pretrained(model_id)
     configure_qwen(model, mode)
@@ -187,6 +224,12 @@ def run_qwen(model_id: str, mode: str, max_tokens: int) -> list[dict[str, str | 
 
 
 def run_hrm_text(model_dir: str, max_tokens: int, dtype: str) -> list[dict[str, str | int | float | bool]]:
+    import mlx.core as mx
+    from transformers import AutoTokenizer
+
+    from mlx_hrm_text.generate import generate as generate_hrm_text
+    from mlx_hrm_text.model import HrmTextForCausalLM
+
     tokenizer = AutoTokenizer.from_pretrained(model_dir, use_fast=True, trust_remote_code=True)
     model = HrmTextForCausalLM.from_pretrained(model_dir, dtype=dtype)
     mx.eval(model.parameters())

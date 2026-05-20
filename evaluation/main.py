@@ -1,7 +1,9 @@
 from typing import Any, Optional
 from collections import defaultdict
+import csv
 import pydantic
 import json
+from pathlib import Path
 from omegaconf import OmegaConf
 
 from utils.functions import load_model_class
@@ -18,6 +20,8 @@ class EvaluationConfig(pydantic.BaseModel):
     model_config = pydantic.ConfigDict(extra='allow')
 
     run_only: Optional[list[str]] = None
+    results_path: Optional[str] = None
+    samples_path: Optional[str] = None
     engine: str
     generation_config: dict[str, Any] = {}
     benchmarks: list[BenchmarkConfig]
@@ -83,6 +87,8 @@ def main():
 
     # 4. Generate and Evaluate per Group
     all_results = {}
+    result_rows = []
+    sample_rows = []
     
     for gen_key, group in grouped_tasks.items():
         gen_kwargs = json.loads(gen_key)
@@ -104,6 +110,26 @@ def main():
             b_generations = generations[start_idx:end_idx]
             metrics = benchmark.compute_metrics(b_generations)
             all_results[b_name] = metrics
+            metric_row = {
+                "benchmark": b_name,
+                "n": metrics.get("n", len(b_generations)),
+            }
+            for key, value in metrics.items():
+                if isinstance(value, (int, float, str, bool)) or value is None:
+                    metric_row[key] = value
+            result_rows.append(metric_row)
+            for offset, generation in enumerate(b_generations):
+                prompt = benchmark.prompts[offset]
+                ground_truth = benchmark.ground_truths[offset]
+                sample_rows.append(
+                    {
+                        "benchmark": b_name,
+                        "sample_index": offset,
+                        "prompt": prompt,
+                        "ground_truth": json.dumps(ground_truth, ensure_ascii=True, default=str),
+                        "generation": generation,
+                    }
+                )
 
     # 5. Summary Report
     print("\n" + "#"*50 + "\nEVALUATION SUMMARY\n" + "#"*50)
@@ -114,6 +140,27 @@ def main():
                 print(f"{k:.<25}: {v:.4f}")
             else:
                 print(f"{k:.<25}: {v}")
+
+    if cfg.results_path:
+        path = Path(cfg.results_path)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        fieldnames = sorted({key for row in result_rows for key in row})
+        preferred = ["benchmark", "n", "acc", "invalid", "em", "f1", "macro_avg", "micro_avg"]
+        fieldnames = [key for key in preferred if key in fieldnames] + [key for key in fieldnames if key not in preferred]
+        with path.open("w", newline="") as handle:
+            writer = csv.DictWriter(handle, fieldnames=fieldnames)
+            writer.writeheader()
+            writer.writerows(result_rows)
+        print(f"\nWrote results: {path}")
+
+    if cfg.samples_path:
+        path = Path(cfg.samples_path)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with path.open("w", newline="") as handle:
+            writer = csv.DictWriter(handle, fieldnames=["benchmark", "sample_index", "prompt", "ground_truth", "generation"])
+            writer.writeheader()
+            writer.writerows(sample_rows)
+        print(f"Wrote samples: {path}")
 
 if __name__ == "__main__":
     main()

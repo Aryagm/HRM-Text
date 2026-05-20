@@ -145,16 +145,15 @@ Current exact-answer results:
 | --- | --- | ---: |
 | Qwen3-0.6B-4bit | Base | 1 / 17 |
 | Qwen3-0.6B-4bit | Qwen-HRM | 2 / 17 |
-| Qwen3-1.7B-4bit | Base | 4 / 17 |
-| Qwen3-1.7B-4bit | Qwen-HRM | 5 / 17 |
-| HRM-Text-1B MLX 4-bit | Native HRM-Text | 3 / 17 |
-| HRM-Text-1B MLX BF16 | Native HRM-Text | 1 / 17 |
+| Qwen3-1.7B-4bit | Base | 6 / 17 |
+| Qwen3-1.7B-4bit | Qwen-HRM | 6 / 17 |
+| HRM-Text-1B MLX 4-bit | Native HRM-Text | 16 / 17 |
+| HRM-Text-1B MLX BF16 | Native HRM-Text | 16 / 17 |
 
-The exact-answer probe supports the same direction as the MC probe, but it also
-shows the current conversion is far from a decisive HRM-level jump. The HRM-Text
-numbers are useful as a local comparison, but they are prompt-sensitive because
-the native HRM-Text model appears to use different formatting and task
-conventions than Qwen chat checkpoints.
+The exact-answer probe is stricter than the MC probe and shows the current
+conversion is far from a decisive HRM-level jump. HRM-Text must be evaluated
+with its documented boxed-answer prompt and enough generation budget; the earlier
+short `Final answer:` prompt undercounted both 4-bit and BF16 badly.
 
 For broader evaluation, the repo's standard benchmark runner now has an MLX
 Qwen-HRM engine. Use it for small Apple Silicon slices before spending time on
