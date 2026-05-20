@@ -51,6 +51,16 @@ def build_prompt(case: ArcCase) -> str:
     return f"{case.question}\nOptions:\n{options}\nAnswer:"
 
 
+def candidate_continuation(label: str, text: str, answer_scoring: str) -> str:
+    if answer_scoring == "label":
+        return label
+    if answer_scoring == "choice_text":
+        return text
+    if answer_scoring == "label_text":
+        return f"{label}. {text}"
+    raise ValueError(f"Unsupported answer_scoring {answer_scoring!r}")
+
+
 def log_softmax_row(logits: mx.array) -> mx.array:
     logits = logits.astype(mx.float32)
     return logits - mx.logsumexp(logits, axis=-1, keepdims=True)
@@ -104,12 +114,21 @@ def configure_model(
     model.fusion_threshold = 0.0
 
 
-def evaluate(model: QwenHrmForCausalLM, tokenizer, cases: list[ArcCase]) -> tuple[int, list[dict[str, object]]]:
+def evaluate(
+    model: QwenHrmForCausalLM,
+    tokenizer,
+    cases: list[ArcCase],
+    *,
+    answer_scoring: str,
+) -> tuple[int, list[dict[str, object]]]:
     rows = []
     correct = 0
     for case in cases:
         prompt_ids = tokenizer(build_prompt(case), add_special_tokens=False)["input_ids"]
-        scores = {label: score_candidate(model, tokenizer, prompt_ids, label) for label, _ in case.choices}
+        scores = {
+            label: score_candidate(model, tokenizer, prompt_ids, candidate_continuation(label, text, answer_scoring))
+            for label, text in case.choices
+        }
         prediction = max(scores.items(), key=lambda item: item[1])[0]
         is_correct = prediction == case.answer
         correct += int(is_correct)
@@ -132,6 +151,12 @@ def main() -> None:
     parser.add_argument("--split", default="validation")
     parser.add_argument("--limit", type=int, default=50)
     parser.add_argument("--mode", choices=("base", "hrm"), default="hrm")
+    parser.add_argument(
+        "--answer-scoring",
+        choices=("label", "choice_text", "label_text"),
+        default="label",
+        help="Candidate continuation to score after the ARC prompt.",
+    )
     parser.add_argument(
         "--logit-fusion",
         choices=("blend", "delta", "prob_blend", "confidence_gate", "agreement_blend"),
@@ -167,7 +192,7 @@ def main() -> None:
     mx.eval(model.parameters())
 
     start = time.perf_counter()
-    correct, rows = evaluate(model, tokenizer, cases)
+    correct, rows = evaluate(model, tokenizer, cases, answer_scoring=args.answer_scoring)
     elapsed = time.perf_counter() - start
     total = len(rows)
 
@@ -177,6 +202,7 @@ def main() -> None:
         "split",
         "limit",
         "mode",
+        "answer_scoring",
         "logit_fusion",
         "logit_blend",
         "h_cycles",
@@ -210,6 +236,7 @@ def main() -> None:
                     "split": args.split,
                     "limit": args.limit,
                     "mode": args.mode,
+                    "answer_scoring": args.answer_scoring,
                     "logit_fusion": model.logit_fusion,
                     "logit_blend": model.logit_blend,
                     "h_cycles": model.model.H_cycles,
@@ -226,7 +253,10 @@ def main() -> None:
                     **row,
                 }
             )
-    print(f"{args.model} {args.mode} ARC-Challenge {args.split}[:{args.limit}]: {correct}/{total}")
+    print(
+        f"{args.model} {args.mode} ARC-Challenge {args.split}[:{args.limit}] "
+        f"{args.answer_scoring}: {correct}/{total}"
+    )
     print(f"wrote {args.out}")
 
 

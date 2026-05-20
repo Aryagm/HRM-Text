@@ -252,6 +252,28 @@ This confirms that agreement-gated fusion preserves base behavior on the full
 validation split for both tested Qwen sizes, but does not create a measurable
 ARC improvement.
 
+ARC scoring-surface follow-up:
+
+| Run | Correct |
+| --- | ---: |
+| Qwen3-0.6B Base, choice text, validation[:50] | 14 / 50 |
+| Qwen3-0.6B agreement gate, choice text, validation[:50] | 14 / 50 |
+| Qwen3-0.6B Base, label + text, validation[:50] | 14 / 50 |
+| Qwen3-0.6B agreement gate, label + text, validation[:50] | 14 / 50 |
+| Qwen3-1.7B Base, choice text, validation[:50] | 20 / 50 |
+| Qwen3-1.7B agreement gate, choice text, validation[:50] | 20 / 50 |
+| Qwen3-1.7B Base, label + text, validation[:50] | 37 / 50 |
+| Qwen3-1.7B agreement gate, label + text, validation[:50] | 37 / 50 |
+| Qwen3-1.7B label + text margin switch, validation[:50] | 38 / 50 |
+| Qwen3-1.7B Base, validation[50:100] | 33 / 50 |
+| Qwen3-1.7B label + text margin switch, validation[50:100] | 33 / 50 |
+
+The richer continuation surface creates one selectable first-slice win for
+Qwen3-1.7B, but it does not improve the next slice. Equal z-score ensembles
+across label, choice-text, and label-text scores were flat for 0.6B and worse
+for 1.7B. Treat this as a useful diagnostic surface, not a solid inference
+upgrade.
+
 For broader evaluation, the repo's standard benchmark runner now has an MLX
 Qwen-HRM engine. Use it for small Apple Silicon slices before spending time on
 full benchmark passes:
