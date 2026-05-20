@@ -208,6 +208,19 @@ not transfer to ARC, and fixed blend is risky outside the tiny hand-written MC
 probe. Agreement-gated fusion is the safer no-training default, but it is
 currently a preservation strategy rather than a reliable improvement strategy.
 
+Exploratory ARC margin switch:
+
+| Run | Correct |
+| --- | ---: |
+| Qwen3-0.6B Base | 21 / 50 |
+| Qwen3-0.6B HRM when base margin <= 0.25 | 23 / 50 |
+| Qwen3-1.7B Base | 37 / 50 |
+| Qwen3-1.7B HRM when base margin <= 0.25 | 36 / 50 |
+
+This suggests the HRM path can help small-model low-confidence MC cases, but the
+threshold is not model-general and was selected from the same ARC slice. Treat it
+as a hypothesis for validation, not a production rule.
+
 For broader evaluation, the repo's standard benchmark runner now has an MLX
 Qwen-HRM engine. Use it for small Apple Silicon slices before spending time on
 full benchmark passes:
