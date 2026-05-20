@@ -9,6 +9,8 @@ description = "Apple MLX optimized inference for HRM-Text"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
+    "huggingface_hub",
+    "jinja2",
     "mlx>=0.31.0",
     "numpy",
     "safetensors",
@@ -22,6 +24,7 @@ dev = ["matplotlib", "opencv-python", "pillow", "pytest"]
 
 [project.scripts]
 hrm-mlx = "mlx_hrm_text.generate:main"
+hrm-mlx-qwen-hrm = "mlx_hrm_text.generate_qwen_hrm:main"
 hrm-mlx-bench = "mlx_hrm_text.benchmark:main"
 hrm-mlx-profile = "mlx_hrm_text.profile_decode:main"
 hrm-mlx-quantize = "conversion.quantize_mlx:main"
