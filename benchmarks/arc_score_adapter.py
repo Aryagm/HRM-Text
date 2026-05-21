@@ -182,6 +182,127 @@ def predict_recurrent(
     return int(scores.argmax()), scores
 
 
+def hrm_scores(x: np.ndarray, params: dict[str, np.ndarray | float | int]) -> tuple[np.ndarray, list[dict[str, np.ndarray]]]:
+    z_h = np.tanh(x @ params["w_h0"].T + params["b_h0"])
+    z_l = np.broadcast_to(params["z_l_init"], z_h.shape).copy()
+    states: list[dict[str, np.ndarray]] = []
+    h_cycles = int(params["h_cycles"])
+    l_cycles = int(params["l_cycles"])
+    for _ in range(h_cycles):
+        for _ in range(l_cycles):
+            z_l_prev = z_l
+            z_h_in = z_h
+            pre = x @ params["w_lx"].T + z_l_prev @ params["w_ll"].T + z_h_in @ params["w_lh"].T + params["b_l"]
+            z_l = np.tanh(pre)
+            states.append({"kind": "L", "x": x, "z_l_prev": z_l_prev, "z_h": z_h_in, "z_l": z_l})
+        z_h_prev = z_h
+        z_l_in = z_l
+        pre = x @ params["w_hx"].T + z_h_prev @ params["w_hh"].T + z_l_in @ params["w_hl"].T + params["b_h"]
+        z_h = np.tanh(pre)
+        states.append({"kind": "H", "x": x, "z_h_prev": z_h_prev, "z_l": z_l_in, "z_h": z_h})
+    return z_h @ params["w_out"] + float(params["out_bias"]), states
+
+
+def train_hrm(
+    groups: list[OptionGroup],
+    *,
+    seed: int,
+    hidden_size: int,
+    h_cycles: int,
+    l_cycles: int,
+    epochs: int,
+    lr: float,
+    weight_decay: float,
+) -> tuple[dict[str, np.ndarray | float | int], np.ndarray, np.ndarray]:
+    mean, std = normalize_features(groups)
+    rng = np.random.default_rng(seed)
+    dim = groups[0].features.shape[1]
+    params: dict[str, np.ndarray | float | int] = {
+        "w_h0": rng.normal(0.0, 0.12, size=(hidden_size, dim)),
+        "b_h0": np.zeros(hidden_size, dtype=np.float64),
+        "z_l_init": rng.normal(0.0, 0.02, size=hidden_size),
+        "w_lx": rng.normal(0.0, 0.08, size=(hidden_size, dim)),
+        "w_ll": rng.normal(0.0, 0.04, size=(hidden_size, hidden_size)),
+        "w_lh": rng.normal(0.0, 0.04, size=(hidden_size, hidden_size)),
+        "b_l": np.zeros(hidden_size, dtype=np.float64),
+        "w_hx": rng.normal(0.0, 0.08, size=(hidden_size, dim)),
+        "w_hh": rng.normal(0.0, 0.04, size=(hidden_size, hidden_size)),
+        "w_hl": rng.normal(0.0, 0.04, size=(hidden_size, hidden_size)),
+        "b_h": np.zeros(hidden_size, dtype=np.float64),
+        "w_out": rng.normal(0.0, 0.1, size=hidden_size),
+        "out_bias": 0.0,
+        "h_cycles": h_cycles,
+        "l_cycles": l_cycles,
+    }
+
+    regularized = [
+        "w_h0",
+        "w_lx",
+        "w_ll",
+        "w_lh",
+        "w_hx",
+        "w_hh",
+        "w_hl",
+        "w_out",
+    ]
+    for _ in range(epochs):
+        grads = {key: np.zeros_like(value) for key, value in params.items() if isinstance(value, np.ndarray)}
+        grad_out_bias = 0.0
+        for group in groups:
+            x = (group.features - mean) / std
+            z_h0 = np.tanh(x @ params["w_h0"].T + params["b_h0"])
+            z_l0 = np.broadcast_to(params["z_l_init"], z_h0.shape).copy()
+            scores, states = hrm_scores(x, params)
+            probs = softmax(scores)
+            probs[group.answer_idx] -= 1.0
+            final_h = states[-1]["z_h"] if states else z_h0
+            grads["w_out"] += final_h.T @ probs
+            grad_out_bias += probs.sum()
+            dz_h = np.outer(probs, params["w_out"])
+            dz_l = np.zeros_like(z_l0)
+
+            for state in reversed(states):
+                if state["kind"] == "H":
+                    hidden = state["z_h"]
+                    grad_pre = dz_h * (1.0 - hidden * hidden)
+                    grads["w_hx"] += grad_pre.T @ state["x"]
+                    grads["w_hh"] += grad_pre.T @ state["z_h_prev"]
+                    grads["w_hl"] += grad_pre.T @ state["z_l"]
+                    grads["b_h"] += grad_pre.sum(axis=0)
+                    dz_h = grad_pre @ params["w_hh"]
+                    dz_l += grad_pre @ params["w_hl"]
+                else:
+                    hidden = state["z_l"]
+                    grad_pre = dz_l * (1.0 - hidden * hidden)
+                    grads["w_lx"] += grad_pre.T @ state["x"]
+                    grads["w_ll"] += grad_pre.T @ state["z_l_prev"]
+                    grads["w_lh"] += grad_pre.T @ state["z_h"]
+                    grads["b_l"] += grad_pre.sum(axis=0)
+                    dz_l = grad_pre @ params["w_ll"]
+                    dz_h += grad_pre @ params["w_lh"]
+
+            grad_h0_pre = dz_h * (1.0 - z_h0 * z_h0)
+            grads["w_h0"] += grad_h0_pre.T @ x
+            grads["b_h0"] += grad_h0_pre.sum(axis=0)
+            grads["z_l_init"] += dz_l.sum(axis=0)
+
+        scale = 1.0 / max(1, len(groups))
+        for key, grad in grads.items():
+            decay = weight_decay * params[key] if key in regularized else 0.0
+            params[key] = params[key] - lr * (scale * grad + decay)
+        params["out_bias"] = float(params["out_bias"]) - lr * scale * grad_out_bias
+    return params, mean, std
+
+
+def predict_hrm(
+    group: OptionGroup,
+    params: tuple[dict[str, np.ndarray | float | int], np.ndarray, np.ndarray],
+) -> tuple[int, np.ndarray]:
+    weights, mean, std = params
+    scores, _ = hrm_scores((group.features - mean) / std, weights)
+    return int(scores.argmax()), scores
+
+
 def baseline_prediction(group: OptionGroup, weight: float) -> int:
     labels = group.labels
     scores = {
@@ -199,7 +320,12 @@ def evaluate(
 ) -> tuple[int, list[dict[str, object]]]:
     correct = 0
     rows = []
-    predictor = predict_linear if adapter == "linear" else predict_recurrent
+    if adapter == "linear":
+        predictor = predict_linear
+    elif adapter == "recurrent":
+        predictor = predict_recurrent
+    else:
+        predictor = predict_hrm
     for group in groups:
         pred_idx, scores = predictor(group, params)
         is_correct = pred_idx == group.answer_idx
@@ -227,9 +353,11 @@ def main() -> None:
     parser.add_argument("--train-csv", type=Path, required=True)
     parser.add_argument("--eval-csv", type=Path, required=True)
     parser.add_argument("--out", type=Path, required=True)
-    parser.add_argument("--adapter", choices=("linear", "recurrent"), default="recurrent")
+    parser.add_argument("--adapter", choices=("linear", "recurrent", "hrm"), default="recurrent")
     parser.add_argument("--seed", type=int, default=2)
     parser.add_argument("--hidden-size", type=int, default=8)
+    parser.add_argument("--h-cycles", type=int, default=2)
+    parser.add_argument("--l-cycles", type=int, default=3)
     parser.add_argument("--epochs", type=int, default=500)
     parser.add_argument("--lr", type=float, default=0.03)
     parser.add_argument("--weight-decay", type=float, default=0.003)
@@ -239,11 +367,22 @@ def main() -> None:
     eval_groups = make_groups(read_rows(args.eval_csv))
     if args.adapter == "linear":
         params = train_linear(train_groups, epochs=args.epochs, lr=args.lr, weight_decay=args.weight_decay)
-    else:
+    elif args.adapter == "recurrent":
         params = train_recurrent(
             train_groups,
             seed=args.seed,
             hidden_size=args.hidden_size,
+            epochs=args.epochs,
+            lr=args.lr,
+            weight_decay=args.weight_decay,
+        )
+    else:
+        params = train_hrm(
+            train_groups,
+            seed=args.seed,
+            hidden_size=args.hidden_size,
+            h_cycles=args.h_cycles,
+            l_cycles=args.l_cycles,
             epochs=args.epochs,
             lr=args.lr,
             weight_decay=args.weight_decay,
@@ -258,7 +397,9 @@ def main() -> None:
         "timestamp_utc": timestamp,
         "adapter": args.adapter,
         "seed": args.seed,
-        "hidden_size": args.hidden_size if args.adapter == "recurrent" else 0,
+        "hidden_size": args.hidden_size if args.adapter in ("recurrent", "hrm") else 0,
+        "h_cycles": args.h_cycles if args.adapter == "hrm" else 0,
+        "l_cycles": args.l_cycles if args.adapter == "hrm" else 0,
         "epochs": args.epochs,
         "lr": args.lr,
         "weight_decay": args.weight_decay,

@@ -303,13 +303,18 @@ Tiny score-adapter validation:
 | Train split | Eval split | Run | Eval raw | Eval fixed calibration | Eval adapter |
 | --- | --- | --- | ---: | ---: | ---: |
 | ARC-Challenge validation[:50] | ARC-Challenge validation[50:100] | Qwen3-1.7B recurrent score adapter over raw/prior option scores | 33 / 50 | 35 / 50 | 37 / 50 |
+| ARC-Challenge validation[:50] | ARC-Challenge validation[50:100] | Qwen3-1.7B HRM-shaped score adapter, H=2 L=3 | 33 / 50 | 35 / 50 | 37 / 50 |
 | ARC-Challenge validation[:50] | ARC-Challenge validation[50:100] | Qwen3-0.6B recurrent score adapter over raw/prior option scores | 17 / 50 | 22 / 50 | 20 / 50 |
+| ARC-Challenge validation[:50] | ARC-Challenge validation[50:100] | Qwen3-0.6B HRM-shaped score adapter, H=2 L=3 | 17 / 50 | 22 / 50 | 20 / 50 |
 
 This is the first quick positive sign for the adapter direction, but it is
 partial: the trained adapter helps Qwen3-1.7B on the next held-out ARC slice and
-hurts Qwen3-0.6B versus simple fixed calibration. Treat it as evidence that
-small trained controllers over frozen Qwen score surfaces can help, not as proof
-that the full HRM adapter strategy is solved.
+hurts Qwen3-0.6B versus simple fixed calibration. The HRM-shaped variant uses
+separate `z_H`/`z_L` state, learned `z_L_init`, additive input injection, and
+`H=2, L=3` cycles from HRM-Text, but it does not yet include deep supervision,
+adaptive halting, or training on hidden states. Treat it as evidence that small
+trained controllers over frozen Qwen score surfaces can help, not as proof that
+the full HRM adapter strategy is solved.
 
 ARC-Easy transfer check:
 

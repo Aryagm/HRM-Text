@@ -292,6 +292,8 @@ const arcCalibrationTransferRows = await readRows("arc_calibration_transfer.csv"
 const arcAdapterRows = [
   ...(await readRows("arc_qwen3_1_7b_score_adapter_recurrent_validation50_to_50_100.csv").catch(() => [])),
   ...(await readRows("arc_qwen3_0_6b_score_adapter_recurrent_validation50_to_50_100.csv").catch(() => [])),
+  ...(await readRows("arc_qwen3_1_7b_score_adapter_hrm_validation50_to_50_100.csv").catch(() => [])),
+  ...(await readRows("arc_qwen3_0_6b_score_adapter_hrm_validation50_to_50_100.csv").catch(() => [])),
 ];
 const finalRows = [...final06, ...final17];
 const finalRuns = uniqueRuns(finalRows);
@@ -814,6 +816,8 @@ writeTable(
     "Adapter",
     "Seed",
     "Hidden",
+    "H",
+    "L",
     "Train Split",
     "Train Limit",
     "Train Correct",
@@ -837,6 +841,8 @@ writeTable(
     r.adapter,
     asNumber(r.seed),
     asNumber(r.hidden_size),
+    asNumber(r.h_cycles || 0),
+    asNumber(r.l_cycles || 0),
     r.train_split,
     asNumber(r.train_limit),
     asNumber(r.train_correct),
@@ -856,7 +862,7 @@ writeTable(
     r.source_file,
   ]),
 );
-arcAdapterSheet.getRange("M2:M20").format.numberFormat = "0.0%";
+arcAdapterSheet.getRange("O2:O20").format.numberFormat = "0.0%";
 
 notes.getRange("A1:B27").values = [
   ["Item", "Note"],
@@ -878,7 +884,7 @@ notes.getRange("A1:B27").values = [
   ["ARC-Easy transfer", "On full ARC-Easy validation, Qwen3-0.6B option-prior calibration transfers from 348/570 to 355/570 at weight 1.0; a post-hoc weight sweep reaches 365/570 at weight 0.8 for both base and agreement_blend. Qwen3-1.7B answer-prior calibration is not robust: weight 1.0 is 488/570 and the best swept weight 0.4 reaches only 490/570."],
   ["ARC auto policy", "benchmarks/qwen_arc_probe.py now supports --calibration auto. It applies the conservative transferred policy: Qwen3-0.6B uses options_prior at weight 1.0; Qwen3-1.7B uses answer_prior at weight 1.0 and avoids the ARC-Challenge-tuned 1.7 weight."],
   ["ARC auto smoke", "Tiny MLX smoke runs verified --calibration auto resolves to options_prior@1.0 for Qwen3-0.6B and answer_prior@1.0 for Qwen3-1.7B on ARC-Challenge validation[:10]."],
-  ["ARC score adapter", "A tiny recurrent adapter trained on saved Qwen option score surfaces is a partial positive signal: Qwen3-1.7B improves validation[50:100] from 33/50 raw and 35/50 fixed calibration to 37/50, while Qwen3-0.6B underperforms fixed calibration at 20/50 vs 22/50."],
+  ["ARC score adapter", "Tiny recurrent and HRM-shaped adapters trained on saved Qwen option score surfaces are partial positive signals: Qwen3-1.7B improves validation[50:100] from 33/50 raw and 35/50 fixed calibration to 37/50. Qwen3-0.6B still underperforms fixed calibration at 20/50 vs 22/50."],
   ["ARC scoring surfaces", "Choice-text scoring is much worse than answer-letter scoring on ARC slices. Qwen3-1.7B label+text scoring ties the 37/50 first-slice base score, and a margin switch reaches 38/50 on validation[:50] but only ties base at 33/50 on validation[50:100]. Treat as exploratory, not solid improvement."],
   ["HRM-Text comparison", "The original HRM-Text exact run used the wrong final-answer prompt/extraction and too small a token cap. Corrected boxed-prompt runs score 16/17 for both 4-bit and BF16."],
   ["Cost", "HRM is slower because it adds warm split and recurrent passes per scored candidate/token."],
@@ -930,7 +936,7 @@ await workbook.render({ sheetName: "ARC Ensembles", range: "A1:H11", scale: 2 })
 await workbook.render({ sheetName: "ARC Score Ensembles", range: "A1:J5", scale: 2 });
 await workbook.render({ sheetName: "ARC Calib Sweeps", range: "A1:K316", scale: 2 });
 await workbook.render({ sheetName: "ARC Calib Transfer", range: "A1:Y9", scale: 2 });
-await workbook.render({ sheetName: "ARC Adapters", range: "A1:U4", scale: 2 });
+await workbook.render({ sheetName: "ARC Adapters", range: "A1:W6", scale: 2 });
 const output = await SpreadsheetFile.exportXlsx(workbook);
 await output.save(OUT_FILE);
 console.log(OUT_FILE);
