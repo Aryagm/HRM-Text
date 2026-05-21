@@ -289,6 +289,10 @@ const arcCalibrationSweepRows = [
   ...(await readRows("arc_easy_qwen3_1_7b_base_calibration_weight_sweep_validation570.csv").catch(() => [])),
 ];
 const arcCalibrationTransferRows = await readRows("arc_calibration_transfer.csv").catch(() => []);
+const arcAdapterRows = [
+  ...(await readRows("arc_qwen3_1_7b_score_adapter_recurrent_validation50_to_50_100.csv").catch(() => [])),
+  ...(await readRows("arc_qwen3_0_6b_score_adapter_recurrent_validation50_to_50_100.csv").catch(() => [])),
+];
 const finalRows = [...final06, ...final17];
 const finalRuns = uniqueRuns(finalRows);
 const sweepRuns = uniqueRuns([
@@ -318,6 +322,7 @@ const arcCalibrationTransferRuns = simpleRunSummary(arcCalibrationTransferRows, 
   "fit_source_file",
   "eval_source_file",
 ]);
+const arcAdapterRuns = simpleRunSummary(arcAdapterRows, ["source_file", "model", "adapter", "seed"]);
 
 const workbook = Workbook.create();
 const summary = workbook.worksheets.add("Summary");
@@ -332,6 +337,7 @@ const arcEnsembleSheet = workbook.worksheets.add("ARC Ensembles");
 const arcScoreEnsembleSheet = workbook.worksheets.add("ARC Score Ensembles");
 const arcCalibrationSweepSheet = workbook.worksheets.add("ARC Calib Sweeps");
 const arcCalibrationTransferSheet = workbook.worksheets.add("ARC Calib Transfer");
+const arcAdapterSheet = workbook.worksheets.add("ARC Adapters");
 const notes = workbook.worksheets.add("Notes");
 
 summary.getRange("A1").values = [["Qwen HRM Conversion Metrics"]];
@@ -800,7 +806,59 @@ writeTable(
 arcCalibrationTransferSheet.getRange("J2:J50").format.numberFormat = "0.0%";
 arcCalibrationTransferSheet.getRange("P2:P50").format.numberFormat = "0.0%";
 
-notes.getRange("A1:B26").values = [
+writeTable(
+  arcAdapterSheet,
+  "A1",
+  [
+    "Model",
+    "Adapter",
+    "Seed",
+    "Hidden",
+    "Train Split",
+    "Train Limit",
+    "Train Correct",
+    "Train Total",
+    "Eval Split",
+    "Eval Limit",
+    "Eval Correct",
+    "Eval Total",
+    "Eval Accuracy",
+    "Raw Correct",
+    "Weight 1 Correct",
+    "Delta vs Raw",
+    "Delta vs Weight 1",
+    "Calibration",
+    "Train Source",
+    "Eval Source",
+    "Source",
+  ],
+  arcAdapterRuns.map((r) => [
+    modelLabel(r.model),
+    r.adapter,
+    asNumber(r.seed),
+    asNumber(r.hidden_size),
+    r.train_split,
+    asNumber(r.train_limit),
+    asNumber(r.train_correct),
+    asNumber(r.train_total),
+    r.eval_split,
+    asNumber(r.eval_limit),
+    asNumber(r.eval_correct),
+    asNumber(r.eval_total),
+    asNumber(r.eval_accuracy),
+    asNumber(r.eval_raw_correct),
+    asNumber(r.eval_weight1_correct),
+    asNumber(r.eval_correct) - asNumber(r.eval_raw_correct),
+    asNumber(r.eval_correct) - asNumber(r.eval_weight1_correct),
+    r.calibration,
+    r.train_source_file,
+    r.eval_source_file,
+    r.source_file,
+  ]),
+);
+arcAdapterSheet.getRange("M2:M20").format.numberFormat = "0.0%";
+
+notes.getRange("A1:B27").values = [
   ["Item", "Note"],
   ["Benchmark", "Closed-form multiple-choice probe scored by candidate letter log-probability."],
   ["Current wins", "Qwen3-0.6B-4bit improves from 5/17 to 7/17 with split 14; Qwen3-1.7B-4bit improves from 10/17 to 11/17 with split 10."],
@@ -820,6 +878,7 @@ notes.getRange("A1:B26").values = [
   ["ARC-Easy transfer", "On full ARC-Easy validation, Qwen3-0.6B option-prior calibration transfers from 348/570 to 355/570 at weight 1.0; a post-hoc weight sweep reaches 365/570 at weight 0.8 for both base and agreement_blend. Qwen3-1.7B answer-prior calibration is not robust: weight 1.0 is 488/570 and the best swept weight 0.4 reaches only 490/570."],
   ["ARC auto policy", "benchmarks/qwen_arc_probe.py now supports --calibration auto. It applies the conservative transferred policy: Qwen3-0.6B uses options_prior at weight 1.0; Qwen3-1.7B uses answer_prior at weight 1.0 and avoids the ARC-Challenge-tuned 1.7 weight."],
   ["ARC auto smoke", "Tiny MLX smoke runs verified --calibration auto resolves to options_prior@1.0 for Qwen3-0.6B and answer_prior@1.0 for Qwen3-1.7B on ARC-Challenge validation[:10]."],
+  ["ARC score adapter", "A tiny recurrent adapter trained on saved Qwen option score surfaces is a partial positive signal: Qwen3-1.7B improves validation[50:100] from 33/50 raw and 35/50 fixed calibration to 37/50, while Qwen3-0.6B underperforms fixed calibration at 20/50 vs 22/50."],
   ["ARC scoring surfaces", "Choice-text scoring is much worse than answer-letter scoring on ARC slices. Qwen3-1.7B label+text scoring ties the 37/50 first-slice base score, and a margin switch reaches 38/50 on validation[:50] but only ties base at 33/50 on validation[50:100]. Treat as exploratory, not solid improvement."],
   ["HRM-Text comparison", "The original HRM-Text exact run used the wrong final-answer prompt/extraction and too small a token cap. Corrected boxed-prompt runs score 16/17 for both 4-bit and BF16."],
   ["Cost", "HRM is slower because it adds warm split and recurrent passes per scored candidate/token."],
@@ -832,8 +891,8 @@ notes.getRange("A1:B1").format = {
   fill: { type: "solid", color: "#1F4E78" },
   font: { color: "#FFFFFF", bold: true },
 };
-notes.getRange("A1:B26").format.wrapText = true;
-notes.getRange("A1:B26").format.autofitColumns();
+notes.getRange("A1:B27").format.wrapText = true;
+notes.getRange("A1:B27").format.autofitColumns();
 
 for (const sheet of [
   summary,
@@ -848,6 +907,7 @@ for (const sheet of [
   arcScoreEnsembleSheet,
   arcCalibrationSweepSheet,
   arcCalibrationTransferSheet,
+  arcAdapterSheet,
   notes,
 ]) {
   sheet.getRange("A1:Z300").format.verticalAlignment = "top";
@@ -870,6 +930,7 @@ await workbook.render({ sheetName: "ARC Ensembles", range: "A1:H11", scale: 2 })
 await workbook.render({ sheetName: "ARC Score Ensembles", range: "A1:J5", scale: 2 });
 await workbook.render({ sheetName: "ARC Calib Sweeps", range: "A1:K316", scale: 2 });
 await workbook.render({ sheetName: "ARC Calib Transfer", range: "A1:Y9", scale: 2 });
+await workbook.render({ sheetName: "ARC Adapters", range: "A1:U4", scale: 2 });
 const output = await SpreadsheetFile.exportXlsx(workbook);
 await output.save(OUT_FILE);
 console.log(OUT_FILE);
