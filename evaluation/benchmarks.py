@@ -1,9 +1,13 @@
 from typing import Any, Optional, Callable
+import itertools
 import re
+import string
 from collections import defaultdict, Counter
 from dataclasses import dataclass
 
 from utils.functions import last_boxed_only_string, compute_benchmark_micro_macro_avg
+
+_DROP_ARTICLES = re.compile(r"\b(a|an|the)\b", re.UNICODE)
 
 
 def load_dataset(*args, **kwargs):
@@ -31,15 +35,158 @@ def math_verify(*args, **kwargs):
 
 
 def drop_process_docs(*args, **kwargs):
-    from lm_eval.tasks.drop.utils import process_docs
+    try:
+        from lm_eval.tasks.drop.utils import process_docs
 
-    return process_docs(*args, **kwargs)
+        return process_docs(*args, **kwargs)
+    except ModuleNotFoundError:
+        dataset = args[0]
+        return dataset.map(_drop_process_doc)
 
 
 def drop_process_results(*args, **kwargs):
-    from lm_eval.tasks.drop.utils import process_results
+    try:
+        from lm_eval.tasks.drop.utils import process_results
 
-    return process_results(*args, **kwargs)
+        return process_results(*args, **kwargs)
+    except ModuleNotFoundError:
+        return _drop_process_results(*args, **kwargs)
+
+
+def _drop_process_doc(doc: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "id": doc["query_id"],
+        "passage": doc["passage"],
+        "question": doc["question"],
+        "answers": _drop_get_answers(doc),
+    }
+
+
+def _drop_get_answers(doc: dict[str, Any]) -> list[tuple[str, ...]]:
+    answers = []
+    answers_set = set()
+    candidates = [doc["answer"]] + _drop_flatten_validated_answers(doc["validated_answers"])
+    for candidate in candidates:
+        answer = _drop_parse_answer(candidate)
+        if answer in answers_set:
+            continue
+        answers_set.add(answer)
+        answers.append(answer)
+    return answers
+
+
+def _drop_flatten_validated_answers(validated_answers: dict[str, Any]) -> list[dict[str, Any]]:
+    valid_answers = []
+    for i in range(len(validated_answers["number"])):
+        valid_answers.append(
+            {
+                "number": validated_answers["number"][i],
+                "date": validated_answers["date"][i],
+                "spans": validated_answers["spans"][i],
+            }
+        )
+    return valid_answers
+
+
+def _drop_parse_answer(answer: dict[str, Any]) -> tuple[str, ...]:
+    if answer["number"] != "":
+        return (str(answer["number"]),)
+    if answer["spans"] != []:
+        return tuple(answer["spans"])
+    return (" ".join([answer["date"]["day"], answer["date"]["month"], answer["date"]["year"]]).strip(),)
+
+
+def _drop_process_results(doc: dict[str, Any], results: list[str]) -> dict[str, float]:
+    max_em = 0.0
+    max_f1 = 0.0
+    for gold_answer in doc["answers"]:
+        exact_match, f1_score = _drop_get_metrics(results, gold_answer)
+        if gold_answer[0].strip():
+            max_em = max(max_em, exact_match)
+        max_f1 = max(max_f1, f1_score)
+    return {"em": max_em, "f1": max_f1}
+
+
+def _drop_get_metrics(predicted: str | list[str], gold: str | tuple[str, ...]) -> tuple[float, float]:
+    predicted_bags = _drop_answer_to_bags(predicted)
+    gold_bags = _drop_answer_to_bags(gold)
+    exact_match = float(
+        set(predicted_bags[0]) == set(gold_bags[0]) and len(predicted_bags[0]) == len(gold_bags[0])
+    )
+    f1_per_bag = _drop_align_bags(predicted_bags[1], gold_bags[1])
+    return exact_match, round(sum(f1_per_bag) / max(1, len(f1_per_bag)), 2)
+
+
+def _drop_answer_to_bags(answer: str | list[str] | tuple[str, ...]) -> tuple[list[str], list[set[str]]]:
+    raw_spans = answer if isinstance(answer, (list, tuple)) else [answer]
+    normalized_spans = []
+    token_bags = []
+    for raw_span in raw_spans:
+        normalized_span = _drop_normalize(str(raw_span))
+        normalized_spans.append(normalized_span)
+        token_bags.append(set(normalized_span.split()))
+    return normalized_spans, token_bags
+
+
+def _drop_align_bags(predicted: list[set[str]], gold: list[set[str]]) -> list[float]:
+    scores = [[0.0 for _ in predicted] for _ in gold]
+    for gold_index, gold_item in enumerate(gold):
+        for pred_index, pred_item in enumerate(predicted):
+            if _drop_match_numbers_if_present(gold_item, pred_item):
+                scores[gold_index][pred_index] = _drop_compute_f1(pred_item, gold_item)
+
+    if not predicted or not gold:
+        return [0.0] * max(len(gold), len(predicted))
+
+    best = 0.0
+    if len(predicted) >= len(gold):
+        for pred_indices in itertools.permutations(range(len(predicted)), len(gold)):
+            best = max(best, sum(scores[row][col] for row, col in enumerate(pred_indices)))
+    else:
+        for gold_indices in itertools.permutations(range(len(gold)), len(predicted)):
+            best = max(best, sum(scores[row][col] for col, row in enumerate(gold_indices)))
+    return [best / max(len(gold), len(predicted))]
+
+
+def _drop_compute_f1(predicted_bag: set[str], gold_bag: set[str]) -> float:
+    intersection = len(gold_bag.intersection(predicted_bag))
+    precision = 1.0 if not predicted_bag else intersection / float(len(predicted_bag))
+    recall = 1.0 if not gold_bag else intersection / float(len(gold_bag))
+    if precision == 0.0 and recall == 0.0:
+        return 0.0
+    return (2 * precision * recall) / (precision + recall)
+
+
+def _drop_match_numbers_if_present(gold_bag: set[str], predicted_bag: set[str]) -> bool:
+    gold_numbers = {word for word in gold_bag if _drop_is_number(word)}
+    predicted_numbers = {word for word in predicted_bag if _drop_is_number(word)}
+    return (not gold_numbers) or bool(gold_numbers.intersection(predicted_numbers))
+
+
+def _drop_is_number(text: str) -> bool:
+    try:
+        float(text)
+        return True
+    except ValueError:
+        return False
+
+
+def _drop_normalize(answer: str) -> str:
+    tokens = [
+        " ".join(_DROP_ARTICLES.sub(" ", _drop_fix_number(_drop_remove_punc(token.lower()))).split())
+        for token in re.split(" |-", answer)
+    ]
+    return " ".join(token for token in tokens if token.strip()).strip()
+
+
+def _drop_remove_punc(text: str) -> str:
+    if _drop_is_number(text):
+        return text
+    return "".join(ch for ch in text if ch not in set(string.punctuation))
+
+
+def _drop_fix_number(text: str) -> str:
+    return str(float(text)) if _drop_is_number(text) else text
 
 class BaseBenchmark:
     def __init__(self):
