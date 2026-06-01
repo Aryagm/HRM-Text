@@ -47,7 +47,7 @@ run_job() {
   fi
 
   write_status "$model_label" "$benchmark" "START" "$(rows_written "$prediction_path")" "$summary_path"
-  {
+  (
     echo
     echo "===== $(timestamp) START $model_label $benchmark ====="
     time PYTHON="$PYTHON" MODEL_DIR="$model_dir" RUN_NAME="$run_name" BENCHMARKS="$benchmark" OUT_DIR="$OUT_DIR" \
@@ -55,7 +55,7 @@ run_job() {
     rc=$?
     echo "===== $(timestamp) END $model_label $benchmark rc=$rc rows=$(rows_written "$prediction_path") ====="
     exit "$rc"
-  } >> "$log_path" 2>&1
+  ) >> "$log_path" 2>&1
 
   local rc=$?
   if [ "$rc" -ne 0 ]; then
